@@ -9,14 +9,17 @@ impl Parser {
         Parser { lexer }
     }
 
+    // does exactly what you think
     fn fail(message: String) -> ! {
         panic!("{message}");
     }
 
+    // begins the parsing process from the input lexer
     pub fn parse(&mut self) -> ast::Prog {
         ast::Prog::Prog(self.parse_func())
     }
 
+    // This parses a function such as ret_type ident(params...) {statements...}
     fn parse_func(&mut self) -> ast::FuncDecl {
         let token = self.lexer.next().expect("Missing return type");
         if let Token::KeywordInt = token {
@@ -86,13 +89,16 @@ impl Parser {
         }
     }
 
+    // Generates the assembly from the abstract syntax tree
     pub fn generate(ast: ast::Prog) -> String {
         let mut asm_output = String::new();
         match ast {
+            // parses the program header
             ast::Prog::Prog(program) => match program {
                 ast::FuncDecl::Func(indentifier, statement) => {
                     asm_output = format!("{asm_output}.globl {indentifier}\n{indentifier}:\n");
                     match statement {
+                        // parses the statements
                         ast::Statement::Return(expr) => match expr {
                             ast::Exp::Integer(int) => {
                                 asm_output = format!("{asm_output}movl ${int}, %eax\nret");

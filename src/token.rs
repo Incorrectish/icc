@@ -1,24 +1,13 @@
 use regex::Regex;
-
 use lazy_static::lazy_static;
 
-// pub const TOKEN_VARIANTS: [Token; 9] = [
-//     OpenBrace,
-//     CloseBrace,
-//     OpenParen,
-//     CloseParen,
-//     Semicolon,
-//     KeywordInt,
-//     KeywordReturn,
-//     Identifier,
-//     IntegerLiteral,
-// ];
-
+// Compiles the regular expressions once at the start of the program for use anywhere
 lazy_static! {
     pub static ref IDENTIFIER_REGEX: Regex = Regex::new(r"^[a-zA-Z]\w*$").unwrap();
     pub static ref INTEGER_LITERAL_REGEX: Regex = Regex::new(r"^[0-9]+$").unwrap();
 }
 
+// These are all the types of tokens so far
 #[derive(Debug, Clone)]
 pub enum Token {
     OpenBrace,
@@ -30,18 +19,7 @@ pub enum Token {
     KeywordReturn,
     Identifier(String),
     IntegerLiteral(String),
+    Negation,
+    BitwiseComplement,
+    LogicalNegation,
 }
-
-// pub const fn from_token(token: Token) -> &'static str {
-//     match token {
-//         Token::OpenBrace => r"\{",
-//         Token::CloseBrace => r"\}",
-//         Token::OpenParen => r"\(",
-//         Token::CloseParen => r"\)",
-//         Token::Semicolon => r";",
-//         Token::KeywordInt => r"int",
-//         Token::KeywordReturn => r"return",
-//         Token::Identifier => r"[a-zA-Z]\w*",
-//         Token::IntegerLiteral => r"[0-9]+",
-//     }
-// }

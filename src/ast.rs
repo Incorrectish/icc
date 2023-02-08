@@ -1,5 +1,12 @@
+// Indentation for pretty printing, made a constant so size can be easily changed
 pub const INDENT: &'static str = "    ";
 
+// These are all the enums necessary for the abstract syntax tree
+// The grammer is as follows:
+// Program ::= Function Decleration
+// Function Decleration ::= (name, Statement)
+// Statement ::= return(Expression)
+// Expression ::= value
 #[derive(Debug)]
 pub enum Exp {
     Integer(i32),

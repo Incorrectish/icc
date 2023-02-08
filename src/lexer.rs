@@ -1,6 +1,7 @@
 use crate::token::{Token, IDENTIFIER_REGEX, INTEGER_LITERAL_REGEX};
 use std::mem;
 
+// The struct simply transforms an input file into a token stream
 #[derive(Debug, Clone)]
 pub struct Lexer {
     pos: usize,
@@ -17,6 +18,7 @@ impl Lexer {
         }
     }
 
+    // This transforms the current substr into it's corresponding token
     fn consume(&mut self) -> Option<Token> {
         let curr_substr = &mem::take(&mut self.curr_substr) as &str;
         match curr_substr {
@@ -30,6 +32,7 @@ impl Lexer {
         }
     }
 
+    // This gets the next token
     pub fn next_token(&mut self) -> Option<Token> {
         if self.pos >= self.input.len() {
             return None;
@@ -54,6 +57,8 @@ impl Lexer {
         }
     }
 
+    // This reads the string until the next token or whitespace is reached, and adds that to the
+    // current substring
     fn consume_until_next_token(&mut self) {
         loop {
             if self.pos >= self.input.len() {
@@ -70,6 +75,8 @@ impl Lexer {
         }
     }
 
+    // Checks if a character matches any of the single character tokens to ensure they don't show
+    // up in the multi character tokens
     fn is_token(curr_char: char) -> bool {
         matches!(curr_char, '{' | '}' | '(' | ')' | ';')
     }
