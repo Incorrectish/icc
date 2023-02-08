@@ -30,5 +30,5 @@ fn compile(filename: String) {
     
     Command::new("gcc").arg(&asm_file).arg("-o").arg("out").output().expect("Failed to run assembler");
 
-    fs::remove_file(&asm_file).expect("Failed to delete file");
+    // fs::remove_file(&asm_file).expect("Failed to delete file");
 }

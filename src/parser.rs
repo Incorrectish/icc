@@ -18,32 +18,32 @@ impl Parser {
     }
 
     fn parse_func(&mut self) -> ast::FuncDecl {
-        let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.next().expect("Missing return type");
         if let Token::KeywordInt = token {
         } else {
             Self::fail(format!("Needs int return type, got {token:?}"));
         }
 
-        let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.next().expect("Missing function name");
         let indentifier = if let Token::Identifier(ident) = token {
             ident
         } else {
             Self::fail(format!("Needs int return type, got {token:?}"));
         };
 
-        let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.next().expect("Missing opening parentheses");
         if let Token::OpenParen = token {
         } else {
             Self::fail(format!("Needs opening parentheses, got {token:?}"));
         }
 
-        let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.next().expect("Missing closing parentheses");
         if let Token::CloseParen = token {
         } else {
             Self::fail(format!("Needs closing parentheses, got {token:?}"));
         }
 
-        let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.next().expect("Missing opening brace");
         if let Token::OpenBrace = token {
         } else {
             Self::fail(format!("Needs opening brace, got {token:?}"));
@@ -51,7 +51,7 @@ impl Parser {
 
         let statement = self.parse_statement();
 
-        let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.next().expect("Missing closing brace");
         if let Token::CloseBrace = token {
         } else {
             Self::fail(format!("Needs closing brace, got {token:?}"));
