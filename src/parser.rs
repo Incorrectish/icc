@@ -85,4 +85,23 @@ impl Parser {
             _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
         }
     }
+
+    pub fn generate(ast: ast::Prog) -> String {
+        let mut asm_output = String::new();
+        match ast {
+            ast::Prog::Prog(program) => match program {
+                ast::FuncDecl::Func(indentifier, statement) => {
+                    asm_output = format!("{asm_output}.globl {indentifier}\n{indentifier}:\n");
+                    match statement {
+                        ast::Statement::Return(expr) => match expr {
+                            ast::Exp::Integer(int) => {
+                                asm_output = format!("{asm_output}movl ${int}, %eax\nret");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        asm_output
+    }
 }
