@@ -12,7 +12,6 @@ fn main() {
     // argument will be the filename given to the compiler
     let filename = env::args().nth(1).expect("Please provide a file to lex");
     compile(filename);
-    // println!("{:?}", parse(filename));
 }
 
 fn compile(filename: String) {
@@ -26,7 +25,6 @@ fn compile(filename: String) {
     let ast = Parser::new(Lexer::new(file_string)).parse();
     let asm = Parser::generate(ast);
 
-    let name = dbg!(name);
     let asm_file = format!("{name}.s");
     write(&asm_file, asm).expect("Failed to write to the assembly file");
     
