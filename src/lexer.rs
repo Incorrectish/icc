@@ -7,15 +7,19 @@ pub struct Lexer {
     pos: usize,
     input: String,
     curr_substr: String,
+    curr_token: Option<Token>
 }
 
 impl Lexer {
     pub fn new(input: String) -> Self {
-        Self {
+        let mut lexer = Self {
             pos: 0,
             input,
             curr_substr: String::new(),
-        }
+            curr_token: None,
+        };
+        lexer.curr_token = lexer.next_token();
+        lexer
     }
 
     // This transforms the current substr into it's corresponding token
@@ -51,7 +55,10 @@ impl Lexer {
             ';' => Some(Token::Semicolon),
             '!' => Some(Token::LogicalNegation),
             '~' => Some(Token::BitwiseComplement),
-            '-' => Some(Token::Negation),
+            '-' => Some(Token::Minus),
+            '+' => Some(Token::Add),
+            '*' => Some(Token::Multiplication),
+            '/' => Some(Token::Division),
             _ if curr_char.is_whitespace() => {
                 self.skip_whitespace();
                 self.next_token()
@@ -80,12 +87,17 @@ impl Lexer {
         }
     }
 
+    fn peek(&mut self) -> Option<Token> {
+        self.curr_token.clone()
+    }
+
     // Checks if a character matches any of the single character tokens to ensure they don't show
     // up in the multi character tokens
     fn is_token(curr_char: char) -> bool {
-        matches!(curr_char, '{' | '}' | '(' | ')' | ';' | '!' | '~' | '-')
+        matches!(curr_char, '{' | '}' | '(' | ')' | ';' | '!' | '~' | '-' | '+' | '*' | '/')
     }
 
+    // Moves position from `pos` to the next non whitespace character
     fn skip_whitespace(&mut self) {
         while self.pos < self.input.len()
             && (self.input.as_bytes()[self.pos] as char).is_whitespace()
@@ -99,6 +111,8 @@ impl Iterator for Lexer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_token()
+        let temp = self.curr_token.take();
+        self.curr_token = self.next_token();
+        temp
     }
 }

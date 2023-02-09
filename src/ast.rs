@@ -6,10 +6,18 @@ pub const INDENT: &str = "    ";
 // Program ::= Function Decleration
 // Function Decleration ::= (name, Statement)
 // Statement ::= return(Expression)
-// Expression ::= value
+// Expression ::= unaryop(operator, expression) | value
 
 #[derive(Debug)]
-pub enum Operator {
+pub enum BinaryOperator {
+    Add,
+    Minus,
+    Multiply,
+    Divide,
+}
+
+#[derive(Debug)]
+pub enum UnaryOperator {
     Negation,
     BitwiseComplement,
     LogicalNegation,
@@ -18,7 +26,8 @@ pub enum Operator {
 #[derive(Debug)]
 pub enum Expression {
     Constant(i32),
-    UnaryOp(Operator, Box<Expression>),
+    UnaryOp(UnaryOperator, Box<Expression>),
+    BinaryOp(BinaryOperator, Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug)]
@@ -80,6 +89,7 @@ impl Expression {
                 expression.print();
                 print!(">");
             }
+            Expression::BinaryOp(binary_operator, left_expr, righ_expr) => todo!()
         }
     }
 

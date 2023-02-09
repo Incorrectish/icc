@@ -10,16 +10,19 @@ lazy_static! {
 // These are all the types of tokens so far
 #[derive(Debug, Clone)]
 pub enum Token {
-    OpenBrace,
-    CloseBrace,
-    OpenParen,
-    CloseParen,
-    Semicolon,
-    KeywordInt,
-    KeywordReturn,
-    Identifier(String),
-    IntegerLiteral(String),
-    Negation,
-    BitwiseComplement,
-    LogicalNegation,
+    OpenBrace, // {
+    CloseBrace, // }
+    OpenParen, // (
+    CloseParen, // )
+    Semicolon, // ;
+    KeywordInt, // 
+    KeywordReturn, // return
+    Identifier(String), // [a-zA-Z]\w+
+    IntegerLiteral(String), // [0-9]+
+    BitwiseComplement, // ~
+    LogicalNegation, // !
+    Minus, // -
+    Add, // +
+    Multiplication, // *
+    Division, // /
 }

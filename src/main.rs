@@ -14,9 +14,9 @@ fn main() {
     // Command args contain the binary directory relative path as the first argument, so the second
     // argument will be the filename given to the compiler
     let filename = env::args().nth(1).expect("Please provide a file to lex");
-    // test_lexer(filename);
+    test_lexer(filename);
     // test_ast(filename);
-    compile(filename);
+    // compile(filename);
 }
 
 fn compile(filename: String) {
@@ -40,15 +40,17 @@ fn compile(filename: String) {
         .output()
         .expect("Failed to run assembler");
 
-    // fs::remove_file(&asm_file).expect("Failed to delete file");
+    fs::remove_file(&asm_file).expect("Failed to delete file");
 }
 
 fn test_lexer(filename: String) {
     let file_string = std::fs::read_to_string(&filename).expect("Couldn't open file");
+    println!("{file_string}");
     dbg!(Lexer::new(file_string).collect::<Vec<_>>());
 }
 
 fn test_ast(filename: String) {
     let file_string = std::fs::read_to_string(&filename).expect("Couldn't open file");
+    println!("{file_string}");
     Parser::new(Lexer::new(file_string)).parse().print();
 }

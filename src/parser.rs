@@ -82,13 +82,51 @@ impl Parser {
                 ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
             }
             Some(Token::BitwiseComplement) => {
-                ast::Expression::UnaryOp(ast::Operator::BitwiseComplement, Box::new(self.parse_expression()))
+                ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression()))
             },
             Some(Token::LogicalNegation) => {
-                ast::Expression::UnaryOp(ast::Operator::LogicalNegation, Box::new(self.parse_expression()))
+                ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression()))
             },
-            Some(Token::Negation) => {
-                ast::Expression::UnaryOp(ast::Operator::Negation, Box::new(self.parse_expression()))
+            Some(Token::Minus) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
+            },
+            _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
+        }
+    }
+
+    fn parse_term(&mut self) -> ast::Expression {
+        let token = self.lexer.next();
+        match token {
+            Some(Token::IntegerLiteral(int_literal)) => {
+                ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+            }
+            Some(Token::BitwiseComplement) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression()))
+            },
+            Some(Token::LogicalNegation) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression()))
+            },
+            Some(Token::Minus) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
+            },
+            _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
+        }
+    }
+
+    fn parse_factor(&mut self) -> ast::Expression {
+        let token = self.lexer.next();
+        match token {
+            Some(Token::IntegerLiteral(int_literal)) => {
+                ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+            }
+            Some(Token::BitwiseComplement) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression()))
+            },
+            Some(Token::LogicalNegation) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression()))
+            },
+            Some(Token::Minus) => {
+                ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
             },
             _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
         }
@@ -134,14 +172,15 @@ impl Parser {
                     new_expr = Self::gen_expression(*expression, register)
                 )
             }
+            ast::Expression::BinaryOp(binary_operator, left_expr, righ_expr) => todo!()
         }
     }
 
-    fn operation(operator: ast::Operator, register: &str) -> String {
+    fn operation(operator: ast::UnaryOperator, register: &str) -> String {
         match operator {
-            ast::Operator::Negation => format!("neg {register}"),
-            ast::Operator::BitwiseComplement => format!("not {register}"),
-            ast::Operator::LogicalNegation => format!("xorl $1, {register}"),
+            ast::UnaryOperator::Negation => format!("neg {register}"),
+            ast::UnaryOperator::BitwiseComplement => format!("not {register}"),
+            ast::UnaryOperator::LogicalNegation => format!("xorl $1, {register}"),
         }
     }
 }
