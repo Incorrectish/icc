@@ -75,41 +75,30 @@ impl Parser {
         statement
     }
 
+    // TODO: Error messages
     fn parse_expression(&mut self) -> ast::Expression {
-        let token = self.lexer.next();
-        match token {
-            Some(Token::IntegerLiteral(int_literal)) => {
-                ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+        let mut term = self.parse_term();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(operation, Some(Token::Minus) | Some(Token::Add)) {
+                return term;
             }
-            Some(Token::BitwiseComplement) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression()))
-            },
-            Some(Token::LogicalNegation) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression()))
-            },
-            Some(Token::Minus) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
-            },
-            _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_term();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term)); 
         }
     }
 
     fn parse_term(&mut self) -> ast::Expression {
-        let token = self.lexer.next();
-        match token {
-            Some(Token::IntegerLiteral(int_literal)) => {
-                ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+        let mut term = self.parse_factor();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(operation, Some(Token::Multiplication) | Some(Token::Division)) {
+                return term;
             }
-            Some(Token::BitwiseComplement) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression()))
-            },
-            Some(Token::LogicalNegation) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression()))
-            },
-            Some(Token::Minus) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
-            },
-            _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_factor();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term)); 
         }
     }
 
@@ -128,7 +117,25 @@ impl Parser {
             Some(Token::Minus) => {
                 ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
             },
+            Some(Token::OpenParen) => {
+                let expression = self.parse_expression();
+                let next_token = self.lexer.next_token();
+                if !matches!(next_token, Some(Token::CloseParen)) {
+                    Self::fail(format!("Token must be an closing parentheses, instead got {next_token:?}"))
+                }
+                expression
+            }
             _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
+        }
+    }
+
+    fn parse_to_op(operation: Token) -> ast::BinaryOperator {
+        match operation {
+            Token::Add => ast::BinaryOperator::Add,
+            Token::Minus => ast::BinaryOperator::Minus,
+            Token::Multiplication => ast::BinaryOperator::Multiply,
+            Token::Division => ast::BinaryOperator::Divide,
+            _ => unreachable!(),
         }
     }
 

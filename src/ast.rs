@@ -89,7 +89,13 @@ impl Expression {
                 expression.print();
                 print!(">");
             }
-            Expression::BinaryOp(binary_operator, left_expr, righ_expr) => todo!()
+            Expression::BinaryOp(binary_operator, left_expr, right_expr) => {
+                print!("(");
+                left_expr.print();
+                print!(" {binary_operator:?} ");
+                right_expr.print();
+                print!(")");
+            }
         }
     }
 
@@ -98,4 +104,8 @@ impl Expression {
     //         Expression::Constant()
     //     }
     // }
+}
+
+impl BinaryOperator {
+
 }

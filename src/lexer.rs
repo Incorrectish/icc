@@ -87,7 +87,7 @@ impl Lexer {
         }
     }
 
-    fn peek(&mut self) -> Option<Token> {
+    pub fn peek(&mut self) -> Option<Token> {
         self.curr_token.clone()
     }
 
