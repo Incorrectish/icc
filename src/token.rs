@@ -1,5 +1,5 @@
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 // Compiles the regular expressions once at the start of the program for use anywhere
 lazy_static! {

@@ -24,8 +24,12 @@ impl Lexer {
         match curr_substr {
             "int" => Some(Token::KeywordInt),
             "return" => Some(Token::KeywordReturn),
-            _ if INTEGER_LITERAL_REGEX.is_match(curr_substr) => Some(Token::IntegerLiteral(curr_substr.to_string())),
-            _ if IDENTIFIER_REGEX.is_match(curr_substr) => Some(Token::Identifier(curr_substr.to_string())),
+            _ if INTEGER_LITERAL_REGEX.is_match(curr_substr) => {
+                Some(Token::IntegerLiteral(curr_substr.to_string()))
+            }
+            _ if IDENTIFIER_REGEX.is_match(curr_substr) => {
+                Some(Token::Identifier(curr_substr.to_string()))
+            }
             _ => {
                 unreachable!("Invalid token: `{curr_substr}`");
             }
@@ -45,6 +49,9 @@ impl Lexer {
             '(' => Some(Token::OpenParen),
             ')' => Some(Token::CloseParen),
             ';' => Some(Token::Semicolon),
+            '!' => Some(Token::LogicalNegation),
+            '~' => Some(Token::BitwiseComplement),
+            '-' => Some(Token::Negation),
             _ if curr_char.is_whitespace() => {
                 self.skip_whitespace();
                 self.next_token()
@@ -65,9 +72,7 @@ impl Lexer {
                 break;
             }
             let curr_char = self.input.as_bytes()[self.pos] as char;
-            if curr_char.is_whitespace()
-                || Self::is_token(curr_char)
-            {
+            if curr_char.is_whitespace() || Self::is_token(curr_char) {
                 break;
             }
             self.curr_substr.push(curr_char);
@@ -78,7 +83,7 @@ impl Lexer {
     // Checks if a character matches any of the single character tokens to ensure they don't show
     // up in the multi character tokens
     fn is_token(curr_char: char) -> bool {
-        matches!(curr_char, '{' | '}' | '(' | ')' | ';')
+        matches!(curr_char, '{' | '}' | '(' | ')' | ';' | '!' | '~' | '-')
     }
 
     fn skip_whitespace(&mut self) {

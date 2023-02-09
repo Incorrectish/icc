@@ -1,5 +1,5 @@
 // Indentation for pretty printing, made a constant so size can be easily changed
-pub const INDENT: &'static str = "    ";
+pub const INDENT: &str = "    ";
 
 // These are all the enums necessary for the abstract syntax tree
 // The grammer is as follows:
@@ -7,14 +7,23 @@ pub const INDENT: &'static str = "    ";
 // Function Decleration ::= (name, Statement)
 // Statement ::= return(Expression)
 // Expression ::= value
+
 #[derive(Debug)]
-pub enum Exp {
-    Integer(i32),
+pub enum Operator {
+    Negation,
+    BitwiseComplement,
+    LogicalNegation,
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Constant(i32),
+    UnaryOp(Operator, Box<Expression>),
 }
 
 #[derive(Debug)]
 pub enum Statement {
-    Return(Exp),
+    Return(Expression),
 }
 
 #[derive(Debug)]
@@ -48,7 +57,7 @@ impl FuncDecl {
             }
         }
     }
-} 
+}
 
 impl Statement {
     fn print(&self, depth: usize) {
@@ -62,10 +71,21 @@ impl Statement {
     }
 }
 
-impl Exp {
+impl Expression {
     fn print(&self) {
         match self {
-            Exp::Integer(int) => print!("Integer<{int}>"),
+            Expression::Constant(int) => print!("int<{int}>"),
+            Expression::UnaryOp(operator, expression) => {
+                print!("{operator:?}<");
+                expression.print();
+                print!(">");
+            }
         }
     }
+
+    // fn gen_assembly(&self) -> String {
+    //     match self {
+    //         Expression::Constant()
+    //     }
+    // }
 }
