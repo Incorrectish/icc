@@ -1,7 +1,20 @@
 .globl main
 main:
-movl $0, %eax
-not %eax
-neg %eax
-xorl $1, %eax
+pushl $2
+pushl $2
+popl %eax
+popl %ebx
+addl %ebx, %eax
+pushl %eax
+pushl $4
+popl %eax
+popl %ebx
+imul %ebx, %eax
+pushl %eax
+pushl $8
+popl %eax
+popl %ebx
+addl %ebx, %eax
+pushl %eax
+popl %eax
 ret

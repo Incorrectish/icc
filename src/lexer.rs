@@ -41,7 +41,7 @@ impl Lexer {
     }
 
     // This gets the next token
-    pub fn next_token(&mut self) -> Option<Token> {
+    fn next_token(&mut self) -> Option<Token> {
         if self.pos >= self.input.len() {
             return None;
         }

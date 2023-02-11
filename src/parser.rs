@@ -1,4 +1,8 @@
-use crate::{ast, lexer::Lexer, token::Token};
+use crate::{
+    ast::{self, BinaryOperator},
+    lexer::Lexer,
+    token::Token,
+};
 
 use colored::Colorize;
 
@@ -85,7 +89,7 @@ impl Parser {
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
             let next_term = self.parse_term();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term)); 
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
@@ -93,12 +97,15 @@ impl Parser {
         let mut term = self.parse_factor();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::Multiplication) | Some(Token::Division)) {
+            if !matches!(
+                operation,
+                Some(Token::Multiplication) | Some(Token::Division)
+            ) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
             let next_term = self.parse_factor();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term)); 
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
@@ -119,9 +126,9 @@ impl Parser {
             },
             Some(Token::OpenParen) => {
                 let expression = self.parse_expression();
-                let next_token = self.lexer.next_token();
+                let next_token = self.lexer.next();
                 if !matches!(next_token, Some(Token::CloseParen)) {
-                    Self::fail(format!("Token must be an closing parentheses, instead got {next_token:?}"))
+                    Self::fail(format!("Token must be an closing parentheses, instead got {next_token:?}"));
                 }
                 expression
             }
@@ -162,32 +169,78 @@ impl Parser {
         match statement {
             // parses the statements
             ast::Statement::Return(expr) => {
-                format!("movl {}\nret", Self::gen_expression(expr, "%eax"))
+                let constructed_assembly =
+                    format!("{}\npopl %eax\nret", Self::gen_expression(expr, "%eax"));
+                // TODO: if the assembly pushes something onto to the stack only to immediately pop
+                // it off onto %eax, replace it with just moving to eax. For example
+                // pushl $5
+                // neg (esp)
+                // popl %eax
+                // ret
+                // can become:
+                // movl $5, %eax
+                // neg %eax
+                // ret
+                constructed_assembly
             }
         }
     }
 
-    fn gen_expression(expr: ast::Expression, register: &str) -> String {
+    fn gen_expression(expr: ast::Expression, location: &str) -> String {
         match expr {
             ast::Expression::Constant(int) => {
-                format!("${int}, {register}")
+                format!("pushl ${int}")
             }
             ast::Expression::UnaryOp(operator, expression) => {
                 format!(
                     "{new_expr}\n{operation}",
-                    operation = Self::operation(operator, register),
-                    new_expr = Self::gen_expression(*expression, register)
+                    new_expr = Self::gen_expression(*expression, location),
+                    operation = Self::operation(operator, location),
                 )
             }
-            ast::Expression::BinaryOp(binary_operator, left_expr, righ_expr) => todo!()
+            ast::Expression::BinaryOp(binary_operator, left_expr, right_expr) => {
+                let left_exp = Self::gen_expression(*left_expr, location);
+                let right_exp = Self::gen_expression(*right_expr, location);
+                let binop = Self::binary_operation(binary_operator);
+                format!(
+                    "{left_exp}\n{right_exp}\npopl %eax\npopl %ebx\n{binop} %ebx, %eax\npushl %eax"
+                )
+            }
         }
     }
 
-    fn operation(operator: ast::UnaryOperator, register: &str) -> String {
+    fn gen_assembly(binop: BinaryOperator, loc1: &str, loc2: &str) -> String {
+        match binop {
+            BinaryOperator::Add => {
+                // result stored in the second register
+                format!("addl {loc1}, {loc2}")
+            }
+            BinaryOperator::Minus => {
+                format!("subl {loc1}, {loc2}")
+            }
+            BinaryOperator::Multiply => {
+                format!("imul {loc1}, {loc2}")
+            }
+            BinaryOperator::Divide => {
+                todo!()
+            }
+        }
+    }
+
+    fn operation(operator: ast::UnaryOperator, location: &str) -> String {
         match operator {
-            ast::UnaryOperator::Negation => format!("neg {register}"),
-            ast::UnaryOperator::BitwiseComplement => format!("not {register}"),
-            ast::UnaryOperator::LogicalNegation => format!("xorl $1, {register}"),
+            ast::UnaryOperator::Negation => format!("neg {location}"),
+            ast::UnaryOperator::BitwiseComplement => format!("not {location}"),
+            ast::UnaryOperator::LogicalNegation => format!("cmpl $0, {location}\nsete {location}"),
+        }
+    }
+
+    fn binary_operation(operator: ast::BinaryOperator) -> String {
+        match operator {
+            ast::BinaryOperator::Add => "addl".to_string(),
+            ast::BinaryOperator::Minus => "subl".to_string(),
+            ast::BinaryOperator::Multiply => "imul".to_string(),
+            ast::BinaryOperator::Divide => todo!(),
         }
     }
 }

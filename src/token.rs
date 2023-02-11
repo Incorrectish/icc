@@ -7,6 +7,7 @@ lazy_static! {
     pub static ref INTEGER_LITERAL_REGEX: Regex = Regex::new(r"^[0-9]+$").unwrap();
 }
 
+#[allow(unused)]
 // These are all the types of tokens so far
 #[derive(Debug, Clone)]
 pub enum Token {
@@ -25,4 +26,18 @@ pub enum Token {
     Add, // +
     Multiplication, // *
     Division, // /
+    Modulo, // %
+    And, // &&
+    Or, // ||
+    Eq, // ==
+    Greater, // >
+    Less, // <
+    GreaterEq, // >=
+    LessEq, // <=
+    NotEqual, // !=
+    Xor, // ^
+    BitwiseAnd, // &
+    BitwiseOr, // |
+    BitwiseLeftShift, // <<
+    BitwiseRightShift, // >>
 }
