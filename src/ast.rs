@@ -14,6 +14,7 @@ pub enum BinaryOperator {
     Minus,
     Multiply,
     Divide,
+    Modulo,
 }
 
 #[derive(Debug)]
@@ -106,6 +107,4 @@ impl Expression {
     // }
 }
 
-impl BinaryOperator {
-
-}
+impl BinaryOperator {}

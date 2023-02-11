@@ -1,23 +1,24 @@
-use crate::{lexer::Lexer, parser::Parser, assembly::*};
+use crate::{assembly::*, lexer::Lexer, parser::Parser};
 use std::{
-    fs::{self, write},
-    process::Command,
     env,
+    fs::{self, write},
     path::Path,
+    process::Command,
 };
 
+mod assembly;
 mod ast;
 mod lexer;
 mod parser;
 mod token;
-mod assembly;
+mod asm_gen;
 
 fn main() {
     // Command args contain the binary directory relative path as the first argument, so the second
     // argument will be the filename given to the compiler
     let filename = env::args().nth(1).expect("Please provide a file to lex");
     test_lexer(Path::new(&filename));
-    // test_ast(filename);
+    test_ast(Path::new(&filename));
     compile(Path::new(&filename));
 }
 
@@ -27,7 +28,7 @@ fn compile(filename: &Path) {
 
     // Generating the abstract syntax tree, and the output assembly from it
     let ast = Parser::new(Lexer::new(file_string)).parse();
-    let asm = Parser::generate(ast);
+    let asm = asm_gen::generate(ast);
 
     let asm_file = filename.with_extension("s");
     Asm::write(asm, &asm_file);

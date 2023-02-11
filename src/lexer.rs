@@ -7,7 +7,7 @@ pub struct Lexer {
     pos: usize,
     input: String,
     curr_substr: String,
-    curr_token: Option<Token>
+    curr_token: Option<Token>,
 }
 
 impl Lexer {
@@ -47,18 +47,74 @@ impl Lexer {
         }
         let curr_char = self.input.as_bytes()[self.pos] as char;
         self.pos += 1;
+        let next_char = self.input.as_bytes().get(self.pos);
         match curr_char {
             '{' => Some(Token::OpenBrace),
             '}' => Some(Token::CloseBrace),
             '(' => Some(Token::OpenParen),
             ')' => Some(Token::CloseParen),
             ';' => Some(Token::Semicolon),
-            '!' => Some(Token::LogicalNegation),
             '~' => Some(Token::BitwiseComplement),
             '-' => Some(Token::Minus),
             '+' => Some(Token::Add),
             '*' => Some(Token::Multiplication),
             '/' => Some(Token::Division),
+            '%' => Some(Token::Modulo),
+            '^' => Some(Token::Xor),
+            '!' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::NotEqual)
+                } else {
+                    Some(Token::LogicalNot)
+                }
+            }
+            '&' => {
+                if next_char == Some(&('&' as u8)) {
+                    self.pos += 1;
+                    Some(Token::LogicalAnd)
+                } else {
+                    Some(Token::BitwiseAnd)
+                }
+            }
+            '|' => {
+                if next_char == Some(&('|' as u8)) {
+                    self.pos += 1;
+                    Some(Token::LogicalOr)
+                } else {
+                    Some(Token::BitwiseOr)
+                }
+            }
+            '>' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::GreaterEq)
+                } else if next_char == Some(&('>' as u8)) {
+                    self.pos += 1;
+                    Some(Token::BitwiseRightShift)
+                } else {
+                    Some(Token::Greater)
+                }
+            }
+            '<' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::LessEq)
+                } else if next_char == Some(&('<' as u8)) {
+                    self.pos += 1;
+                    Some(Token::BitwiseLeftShift)
+                } else {
+                    Some(Token::Less)
+                }
+            }
+            '=' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::Equal)
+                } else {
+                    Some(Token::Assign)
+                }
+            }
             _ if curr_char.is_whitespace() => {
                 self.skip_whitespace();
                 self.next_token()
@@ -94,7 +150,26 @@ impl Lexer {
     // Checks if a character matches any of the single character tokens to ensure they don't show
     // up in the multi character tokens
     fn is_token(curr_char: char) -> bool {
-        matches!(curr_char, '{' | '}' | '(' | ')' | ';' | '!' | '~' | '-' | '+' | '*' | '/')
+        matches!(
+            curr_char,
+            '{' | '}'
+                | '('
+                | ')'
+                | ';'
+                | '!'
+                | '~'
+                | '-'
+                | '+'
+                | '*'
+                | '/'
+                | '%'
+                | '>'
+                | '='
+                | '<'
+                | '^'
+                | '&'
+                | '|'
+        )
     }
 
     // Moves position from `pos` to the next non whitespace character

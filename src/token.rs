@@ -7,37 +7,38 @@ lazy_static! {
     pub static ref INTEGER_LITERAL_REGEX: Regex = Regex::new(r"^[0-9]+$").unwrap();
 }
 
-#[allow(unused)]
+// #[allow(unused)]
 // These are all the types of tokens so far
 #[derive(Debug, Clone)]
 pub enum Token {
-    OpenBrace, // {
-    CloseBrace, // }
-    OpenParen, // (
-    CloseParen, // )
-    Semicolon, // ;
-    KeywordInt, // 
-    KeywordReturn, // return
-    Identifier(String), // [a-zA-Z]\w+
+    OpenBrace,              // {
+    CloseBrace,             // }
+    OpenParen,              // (
+    CloseParen,             // )
+    Semicolon,              // ;
+    KeywordInt,             //
+    KeywordReturn,          // return
+    Identifier(String),     // [a-zA-Z]\w+
     IntegerLiteral(String), // [0-9]+
-    BitwiseComplement, // ~
-    LogicalNegation, // !
-    Minus, // -
-    Add, // +
-    Multiplication, // *
-    Division, // /
-    Modulo, // %
-    And, // &&
-    Or, // ||
-    Eq, // ==
-    Greater, // >
-    Less, // <
-    GreaterEq, // >=
-    LessEq, // <=
-    NotEqual, // !=
-    Xor, // ^
-    BitwiseAnd, // &
-    BitwiseOr, // |
-    BitwiseLeftShift, // <<
-    BitwiseRightShift, // >>
+    BitwiseComplement,      // ~
+    LogicalNot,             // !
+    Minus,                  // -
+    Add,                    // +
+    Multiplication,         // *
+    Division,               // /
+    Modulo,                 // %
+    Assign,                 // =
+    BitwiseAnd,             // &
+    BitwiseOr,              // |
+    Xor,                    // ^
+    Greater,                // >
+    Less,                   // <
+    LogicalAnd,             // &&
+    LogicalOr,              // ||
+    Equal,                  // ==
+    GreaterEq,              // >=
+    LessEq,                 // <=
+    NotEqual,               // !=
+    BitwiseLeftShift,       // <<
+    BitwiseRightShift,      // >>
 }

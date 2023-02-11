@@ -1,11 +1,11 @@
 main: 
 .globl main
-pushq $4
-pushq $2
-popq %rax
+pushq $1
+pushq $0
+movq $2,%rax
 popq %rbx
-cltd 
+cqo 
 idiv %rbx
-pushq %rax
+addq %rax,(%rsp)
 popq %rax
 ret 
