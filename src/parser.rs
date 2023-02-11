@@ -1,4 +1,5 @@
 use crate::{
+    assembly::*,
     ast::{self, BinaryOperator},
     lexer::Lexer,
     token::Token,
@@ -147,30 +148,33 @@ impl Parser {
     }
 
     // Generates the assembly from the abstract syntax tree
-    pub fn generate(ast: ast::Prog) -> String {
+    pub fn generate(ast: ast::Prog) -> Asm {
         match ast {
             // parses the program header
             ast::Prog::Prog(function_decleration) => Self::gen_function(function_decleration),
         }
     }
 
-    fn gen_function(function_decleration: ast::FuncDecl) -> String {
+    fn gen_function(function_decleration: ast::FuncDecl) -> Asm {
         match function_decleration {
-            ast::FuncDecl::Func(indentifier, statement) => {
-                format!(
-                    ".globl {indentifier}\n{indentifier}:\n{}",
-                    Self::gen_statement(statement)
-                )
-            }
+            ast::FuncDecl::Func(indentifier, statement) => Asm::from_instr(
+                vec![
+                    AsmInstr::new(".globl".to_string(), indentifier.clone()),
+                    AsmInstr::new(format!("{indentifier}:"), String::new()),
+                ],
+                Self::gen_statement(statement),
+            ),
         }
     }
 
-    fn gen_statement(statement: ast::Statement) -> String {
+    fn gen_statement(statement: ast::Statement) -> Asm {
         match statement {
             // parses the statements
             ast::Statement::Return(expr) => {
-                let constructed_assembly =
-                    format!("{}\npopl %eax\nret", Self::gen_expression(expr, "%eax"));
+                let constructed_assembly = Asm::new(
+                    Self::gen_expression(expr, "%eax"),
+                    vec![AsmInstr::from("popl", "%eax"), AsmInstr::from("ret", "")],
+                );
                 // TODO: if the assembly pushes something onto to the stack only to immediately pop
                 // it off onto %eax, replace it with just moving to eax. For example
                 // pushl $5
@@ -186,52 +190,62 @@ impl Parser {
         }
     }
 
-    fn gen_expression(expr: ast::Expression, location: &str) -> String {
+    fn gen_expression(expr: ast::Expression, location: &str) -> Asm {
         match expr {
             ast::Expression::Constant(int) => {
-                format!("pushl ${int}")
+                Asm::instruction("pushl".to_string(), format!("${int}"))
             }
             ast::Expression::UnaryOp(operator, expression) => {
-                format!(
-                    "{new_expr}\n{operation}",
-                    new_expr = Self::gen_expression(*expression, location),
-                    operation = Self::operation(operator, location),
-                )
+                let mut asm = Self::gen_expression(*expression, location);
+                asm.add_instructions(Self::operation(operator, location));
+                asm
             }
             ast::Expression::BinaryOp(binary_operator, left_expr, right_expr) => {
-                let left_exp = Self::gen_expression(*left_expr, location);
+                let mut left_exp = Self::gen_expression(*left_expr, location);
                 let right_exp = Self::gen_expression(*right_expr, location);
-                let binop = Self::binary_operation(binary_operator);
-                format!(
-                    "{left_exp}\n{right_exp}\npopl %eax\npopl %ebx\n{binop} %ebx, %eax\npushl %eax"
-                )
+                left_exp.add_instructions(right_exp);
+                if matches!(binary_operator, BinaryOperator::Divide) {
+                    todo!()
+                } else {
+                    let binop = Self::binary_operation(binary_operator);
+                    // Note the following might be a bit of a premature optimization. I assume that the
+                    // size of the data is 4 bytes, so I can read the first two values off the stack
+                    // into a register, and then operate on them and write them back to the stack,
+                    // minimizing push/pop instructions
+                    left_exp.append_instruction("popl".into(), "%eax".into());
+                    left_exp.append_instruction(binop, "%eax, (%esp)".into());
+                    left_exp
+                    // format!(
+                    //     "{left_exp}\n{right_exp}\npopl %eax\npopl %ebx\n{binop} %ebx, %eax\npushl %eax"
+                    // )
+                }
             }
         }
     }
 
-    fn gen_assembly(binop: BinaryOperator, loc1: &str, loc2: &str) -> String {
-        match binop {
-            BinaryOperator::Add => {
-                // result stored in the second register
-                format!("addl {loc1}, {loc2}")
-            }
-            BinaryOperator::Minus => {
-                format!("subl {loc1}, {loc2}")
-            }
-            BinaryOperator::Multiply => {
-                format!("imul {loc1}, {loc2}")
-            }
-            BinaryOperator::Divide => {
-                todo!()
-            }
-        }
-    }
-
-    fn operation(operator: ast::UnaryOperator, location: &str) -> String {
+    fn operation(operator: ast::UnaryOperator, location: &str) -> Asm {
+        // Note the following might be a bit of a premature optimization. For all the cases,
+        // instead of pushing/popping the values off the stack into the ecx register, I instead
+        // copy them into a register then operate on them, then write to a register, minimizing
+        // costly memory operations
         match operator {
-            ast::UnaryOperator::Negation => format!("neg {location}"),
-            ast::UnaryOperator::BitwiseComplement => format!("not {location}"),
-            ast::UnaryOperator::LogicalNegation => format!("cmpl $0, {location}\nsete {location}"),
+            ast::UnaryOperator::Negation => Asm::instructions(vec![
+                AsmInstr::from("movl", "(%esp), %ecx"),
+                AsmInstr::from("negl", "%ecx"),
+                AsmInstr::from("movl", "%ecx, (%esp)"),
+            ]),
+            ast::UnaryOperator::BitwiseComplement => Asm::instructions(vec![
+                AsmInstr::from("movl", "(%esp), %ecx"),
+                AsmInstr::from("notl", "%ecx"),
+                AsmInstr::from("movl", "%ecx, (%esp)"),
+            ]),
+            ast::UnaryOperator::LogicalNegation => Asm::instructions(vec![
+                AsmInstr::from("movl", "(%esp), %ecx"),
+                AsmInstr::from("cmpl", "$0, %ecx"),
+                AsmInstr::from("sete", "%ecx"),
+                AsmInstr::from("movl", "%ecx, (%esp)"),
+            ]),
+            // format!("cmpl $0, {location}\nsete {location}"),
         }
     }
 
@@ -240,7 +254,7 @@ impl Parser {
             ast::BinaryOperator::Add => "addl".to_string(),
             ast::BinaryOperator::Minus => "subl".to_string(),
             ast::BinaryOperator::Multiply => "imul".to_string(),
-            ast::BinaryOperator::Divide => todo!(),
+            ast::BinaryOperator::Divide => "idiv".to_string(),
         }
     }
 }

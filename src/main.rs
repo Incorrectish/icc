@@ -1,4 +1,4 @@
-use crate::{lexer::Lexer, parser::Parser};
+use crate::{lexer::Lexer, parser::Parser, assembly::*};
 use std::{
     fs::{self, write},
     process::Command,
@@ -30,7 +30,7 @@ fn compile(filename: &Path) {
     let asm = Parser::generate(ast);
 
     let asm_file = filename.with_extension("s");
-    write(&asm_file, asm).expect("Failed to write to the assembly file");
+    Asm::write(asm, &asm_file);
 
     let parent_path = filename.parent().unwrap_or(Path::new(""));
     Command::new("gcc")

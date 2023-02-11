@@ -1,20 +1,14 @@
+main: 
 .globl main
-main:
 pushl $2
 pushl $2
 popl %eax
-popl %ebx
-addl %ebx, %eax
-pushl %eax
+addl %eax, (%esp)
 pushl $4
 popl %eax
-popl %ebx
-imul %ebx, %eax
-pushl %eax
+imul %eax, (%esp)
 pushl $8
 popl %eax
-popl %ebx
-addl %ebx, %eax
-pushl %eax
+addl %eax, (%esp)
 popl %eax
-ret
+ret 
