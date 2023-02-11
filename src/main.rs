@@ -33,12 +33,12 @@ fn compile(filename: &Path) {
     Asm::write(asm, &asm_file);
 
     let parent_path = filename.parent().unwrap_or(Path::new(""));
-    Command::new("gcc")
+    dbg!(Command::new("gcc")
         .arg(&asm_file)
         .arg("-o")
         .arg(parent_path.join("out"))
         .output()
-        .expect("Failed to run assembler");
+        .expect("Failed to run assembler"));
 
     // fs::remove_file(&asm_file).expect("Failed to delete file");
 }

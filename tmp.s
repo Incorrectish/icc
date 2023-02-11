@@ -1,20 +1,20 @@
 .globl main
 main:
-pushl $2
-pushl $2
-popl %eax
-popl %ebx
-addl %ebx, %eax
-pushl %eax
-pushl $4
-popl %eax
-popl %ebx
-imul %ebx, %eax
-pushl %eax
-pushl $8
-popl %eax
-popl %ebx
-addl %ebx, %eax
-pushl %eax
-popl %eax
+pushq $2
+pushq $2
+popq %rax
+popq %rbx
+addq %rbx, %rax
+pushq %rax
+pushq $4
+popq %rax
+popq %rbx
+imul %rbx, %rax
+pushq %rax
+pushq $8
+popq %rax
+popq %rbx
+addq %rbx, %rax
+pushq %rax
+popq %rax
 ret
