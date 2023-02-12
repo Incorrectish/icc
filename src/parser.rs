@@ -97,6 +97,22 @@ impl Parser {
     //
 
     fn parse_expression(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_or();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::BitwiseOr) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_bit_or();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_bit_or(&mut self) -> ast::Expression {
         let mut term = self.parse_bit_xor();
         loop {
             let operation = self.lexer.peek();
@@ -118,7 +134,7 @@ impl Parser {
             let operation = self.lexer.peek();
             if !matches!(
                 operation,
-                Some(Token::LogicalAnd) 
+                Some(Token::BitwiseAnd) 
             ) {
                 return term;
             }
