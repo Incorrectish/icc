@@ -62,22 +62,28 @@ fn gen_expression(expr: ast::Expression, location: &str) -> Asm {
             left_exp.add_instructions(right_exp);
             let binop = asm_gen::binary_operation(&binary_operator);
             if matches!(binary_operator, BinaryOperator::Divide) {
-                left_exp.append_instruction("popq".into(), "%rax".into());
                 left_exp.append_instruction("popq".into(), "%rbx".into());
+                left_exp.append_instruction("popq".into(), "%rax".into());
                 left_exp.append_instruction("cqo".into(), String::new());
                 left_exp.append_instruction(binop, "%rbx".into());
                 left_exp.append_instruction("pushq".into(), "%rax".into());
             } else if matches!(binary_operator, BinaryOperator::Multiply) {
-                left_exp.append_instruction("popq".into(), "%rax".into());
+                // TODO: result is actually not just in rax, but in two registers potentially so
+                // see that that is fixed
                 left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction(binop, "%rbx, %rax".into());
+                left_exp.append_instruction("popq".into(), "%rax".into());
+                left_exp.append_instruction(binop, "%rbx,%rax".into());
                 left_exp.append_instruction("pushq".into(), "%rax".into());
             } else if matches!(binary_operator, BinaryOperator::Modulo) {
-                left_exp.append_instruction("popq".into(), "%rax".into());
                 left_exp.append_instruction("popq".into(), "%rbx".into());
+                left_exp.append_instruction("popq".into(), "%rax".into());
                 left_exp.append_instruction("cqo".into(), String::new());
                 left_exp.append_instruction(binop, "%rbx".into());
                 left_exp.append_instruction("pushq".into(), "%rdx".into());
+            } else if matches!(binary_operator, BinaryOperator::BitwiseLeftShift | BinaryOperator::BitwiseRightShift) {
+                // TODO: maybe clear the rcx register?
+                left_exp.append_instruction("popq".into(), "%rcx".into());
+                left_exp.append_instruction(binop, "%rcx,(%rsp)".into());
             } else {
                 // Note the following might be a bit of a premature optimization. I assume that the
                 // size of the data is 4 bytes, so I can read the first two values off the stack
@@ -108,7 +114,7 @@ fn operation(operator: ast::UnaryOperator, location: &str) -> Asm {
         ast::UnaryOperator::BitwiseComplement => Asm::instructions(vec![
             AsmInstr::from("movq", "(%rsp),%rcx"),
             AsmInstr::from("notq", "%rcx"),
-            AsmInstr::from("movq", "%rcx, (%rsp)"),
+            AsmInstr::from("movq", "%rcx,(%rsp)"),
         ]),
         ast::UnaryOperator::LogicalNegation => Asm::instructions(vec![
             AsmInstr::from("movq", "(%rsp),%rcx"),
@@ -125,7 +131,13 @@ fn binary_operation(operator: &ast::BinaryOperator) -> String {
         ast::BinaryOperator::Add => "addq".to_string(),
         ast::BinaryOperator::Minus => "subq".to_string(),
         ast::BinaryOperator::Multiply => "imulq".to_string(),
-        ast::BinaryOperator::Divide => "idiv".to_string(),
-        ast::BinaryOperator::Modulo => "idiv".to_string(),
+        ast::BinaryOperator::Divide => "idivq".to_string(),
+        ast::BinaryOperator::Modulo => "idivq".to_string(),
+        ast::BinaryOperator::Xor => "xorq".to_string(),
+        ast::BinaryOperator::BitwiseAnd => "andq".to_string(),
+        ast::BinaryOperator::BitwiseOr => "orq".to_string(),
+        // TODO: fix these
+        ast::BinaryOperator::BitwiseRightShift => "sarq".to_string(),
+        ast::BinaryOperator::BitwiseLeftShift => "salq".to_string(),
     }
 }

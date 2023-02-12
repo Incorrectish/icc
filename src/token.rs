@@ -24,8 +24,8 @@ pub enum Token {
     LogicalNot,             // !
     Minus,                  // -
     Add,                    // +
-    Multiplication,         // *
-    Division,               // /
+    Multiply,               // *
+    Divide,                 // /
     Modulo,                 // %
     Assign,                 // =
     BitwiseAnd,             // &

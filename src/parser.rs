@@ -73,6 +73,7 @@ impl Parser {
         }
         let exp = self.parse_expression();
         let statement = ast::Statement::Return(exp);
+        let statement = dbg!(statement);
         let token = self.lexer.next().expect("Invalid token sequence");
         if !matches!(token, Token::Semicolon) {
             Self::fail(format!("Needs semicolon, got {token:?}"));
@@ -81,7 +82,86 @@ impl Parser {
     }
 
     // TODO: Error messages
+    // fn parse_expression(&mut self) -> ast::Expression {
+    //     let mut term = self.parse_term();
+    //     loop {
+    //         let operation = self.lexer.peek();
+    //         if !matches!(operation, Some(Token::Minus) | Some(Token::Add)) {
+    //             return term;
+    //         }
+    //         let operation = Self::parse_to_op(self.lexer.next().unwrap());
+    //         let next_term = self.parse_term();
+    //         term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+    //     }
+    // }
+    //
+
     fn parse_expression(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_xor();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::Xor) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_bit_xor();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_bit_xor(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_and();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::LogicalAnd) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_bit_and();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_bit_and(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_shift();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::BitwiseLeftShift) | Some(Token::BitwiseRightShift) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_bit_shift();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+
+    fn parse_bit_shift(&mut self) -> ast::Expression {
+        let mut term = self.parse_add_sub();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::LogicalAnd) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_add_sub();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_add_sub(&mut self) -> ast::Expression {
         let mut term = self.parse_term();
         loop {
             let operation = self.lexer.peek();
@@ -93,14 +173,13 @@ impl Parser {
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
-
     fn parse_term(&mut self) -> ast::Expression {
         let mut term = self.parse_factor();
         loop {
             let operation = self.lexer.peek();
             if !matches!(
                 operation,
-                Some(Token::Multiplication) | Some(Token::Division) | Some(Token::Modulo)
+                Some(Token::Multiply) | Some(Token::Divide) | Some(Token::Modulo)
             ) {
                 return term;
             }
@@ -137,29 +216,18 @@ impl Parser {
         }
     }
 
-    fn parse_bit_shift(&mut self) -> ast::Expression {
-        todo!()
-    }
-
-    fn parse_bit_and(&mut self) -> ast::Expression {
-        todo!()
-    }
-
-    fn parse_bit_xor(&mut self) -> ast::Expression {
-        todo!()
-    }
-
-    fn parse_bit_or(&mut self) -> ast::Expression {
-        todo!()
-    }
-
     fn parse_to_op(operation: Token) -> ast::BinaryOperator {
         match operation {
             Token::Add => ast::BinaryOperator::Add,
             Token::Minus => ast::BinaryOperator::Minus,
-            Token::Multiplication => ast::BinaryOperator::Multiply,
-            Token::Division => ast::BinaryOperator::Divide,
+            Token::Multiply => ast::BinaryOperator::Multiply,
+            Token::Divide => ast::BinaryOperator::Divide,
             Token::Modulo => ast::BinaryOperator::Modulo,
+            Token::BitwiseAnd => ast::BinaryOperator::BitwiseOr,
+            Token::BitwiseOr => ast::BinaryOperator::BitwiseAnd,
+            Token::Xor => ast::BinaryOperator::Xor,
+            Token::BitwiseRightShift => ast::BinaryOperator::BitwiseRightShift,
+            Token::BitwiseLeftShift => ast::BinaryOperator::BitwiseLeftShift,
             _ => unreachable!(),
         }
     }

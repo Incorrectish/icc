@@ -1,3 +1,3 @@
 int main() {
-    return 1 + 0 / 2;
+    return 5 ^ 3 + 4 * 15 + 3 * 3 >> 3;
 }

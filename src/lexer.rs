@@ -57,8 +57,8 @@ impl Lexer {
             '~' => Some(Token::BitwiseComplement),
             '-' => Some(Token::Minus),
             '+' => Some(Token::Add),
-            '*' => Some(Token::Multiplication),
-            '/' => Some(Token::Division),
+            '*' => Some(Token::Multiply),
+            '/' => Some(Token::Divide),
             '%' => Some(Token::Modulo),
             '^' => Some(Token::Xor),
             '!' => {
