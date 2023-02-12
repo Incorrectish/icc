@@ -20,6 +20,14 @@ pub enum BinaryOperator {
     BitwiseOr,
     BitwiseAnd,
     Xor,
+    GreaterEq,
+    Greater,
+    LessEq,
+    Less,
+    Equal,
+    NotEqual,
+    LogicalAnd,
+    LogicalOr,
 }
 
 #[derive(Debug)]

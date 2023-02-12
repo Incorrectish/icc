@@ -139,5 +139,15 @@ fn binary_operation(operator: &ast::BinaryOperator) -> String {
         // TODO: fix these
         ast::BinaryOperator::BitwiseRightShift => "sarq".to_string(),
         ast::BinaryOperator::BitwiseLeftShift => "salq".to_string(),
+
+
+        ast::BinaryOperator::GreaterEq => todo!(),
+        ast::BinaryOperator::Greater => todo!(),
+        ast::BinaryOperator::LessEq => todo!(),
+        ast::BinaryOperator::Less => todo!(),
+        ast::BinaryOperator::NotEqual => todo!(),
+        ast::BinaryOperator::Equal => todo!(),
+        ast::BinaryOperator::LogicalAnd => todo!(),
+        ast::BinaryOperator::LogicalOr => todo!(),
     }
 }

@@ -82,21 +82,39 @@ impl Parser {
     }
 
     // TODO: Error messages
-    // fn parse_expression(&mut self) -> ast::Expression {
-    //     let mut term = self.parse_term();
-    //     loop {
-    //         let operation = self.lexer.peek();
-    //         if !matches!(operation, Some(Token::Minus) | Some(Token::Add)) {
-    //             return term;
-    //         }
-    //         let operation = Self::parse_to_op(self.lexer.next().unwrap());
-    //         let next_term = self.parse_term();
-    //         term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
-    //     }
-    // }
-    //
-
     fn parse_expression(&mut self) -> ast::Expression {
+        let mut term = self.parse_logical_or();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::LogicalOr) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_logical_or();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_logical_or(&mut self) -> ast::Expression {
+        let mut term = self.parse_logical_and();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::LogicalAnd) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_logical_and();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_logical_and(&mut self) -> ast::Expression {
         let mut term = self.parse_bit_or();
         loop {
             let operation = self.lexer.peek();
@@ -145,6 +163,38 @@ impl Parser {
     }
 
     fn parse_bit_and(&mut self) -> ast::Expression {
+        let mut term = self.parse_equality_expr();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::Equal) | Some(Token::NotEqual) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_equality_expr();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_equality_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_relational_expr();
+        loop {
+            let operation = self.lexer.peek();
+            if !matches!(
+                operation,
+                Some(Token::LessEq) | Some(Token::GreaterEq) | Some(Token::Less) | Some(Token::Greater) 
+            ) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_relational_expr();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_relational_expr(&mut self) -> ast::Expression {
         let mut term = self.parse_bit_shift();
         loop {
             let operation = self.lexer.peek();
@@ -159,7 +209,6 @@ impl Parser {
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
-
 
     fn parse_bit_shift(&mut self) -> ast::Expression {
         let mut term = self.parse_add_sub();
@@ -244,6 +293,14 @@ impl Parser {
             Token::Xor => ast::BinaryOperator::Xor,
             Token::BitwiseRightShift => ast::BinaryOperator::BitwiseRightShift,
             Token::BitwiseLeftShift => ast::BinaryOperator::BitwiseLeftShift,
+            Token::Greater => ast::BinaryOperator::Greater,
+            Token::GreaterEq => ast::BinaryOperator::GreaterEq,
+            Token::Less => ast::BinaryOperator::Less,
+            Token::LessEq => ast::BinaryOperator::LessEq,
+            Token::Equal => ast::BinaryOperator::Equal,
+            Token::NotEqual => ast::BinaryOperator::NotEqual,
+            Token::LogicalOr => ast::BinaryOperator::LogicalOr,
+            Token::LogicalAnd => ast::BinaryOperator::LogicalAnd,
             _ => unreachable!(),
         }
     }

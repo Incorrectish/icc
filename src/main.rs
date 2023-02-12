@@ -19,7 +19,7 @@ fn main() {
     let filename = env::args().nth(1).expect("Please provide a file to lex");
     // test_lexer(Path::new(&filename));
     test_ast(Path::new(&filename));
-    compile(Path::new(&filename));
+    // compile(Path::new(&filename));
 }
 
 fn compile(filename: &Path) {
