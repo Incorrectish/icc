@@ -1,13 +1,15 @@
-main: 
 .globl main
-pushq $5
-pushq $3
-pushq $4
-movq $15,%rax
-orq %rax,(%rsp)
-popq %rax
-xorq %rax,(%rsp)
-popq %rax
-andq %rax,(%rsp)
-popq %rax
-ret 
+main: 
+    pushq $5
+    movq $3,%rbx
+    cmpq $0,(%rsp)
+    je .logicaljump0
+    cmpq $0,%rbx
+    je .logicaljump0
+    movq $1,(%rsp)
+    jmp .logicaljump1
+.logicaljump0: 
+    movq $0,(%rsp)
+.logicaljump1: 
+    popq %rax
+    ret 

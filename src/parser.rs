@@ -86,10 +86,7 @@ impl Parser {
         let mut term = self.parse_logical_or();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::LogicalOr) 
-            ) {
+            if !matches!(operation, Some(Token::LogicalOr)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -102,10 +99,7 @@ impl Parser {
         let mut term = self.parse_logical_and();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::LogicalAnd) 
-            ) {
+            if !matches!(operation, Some(Token::LogicalAnd)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -118,10 +112,7 @@ impl Parser {
         let mut term = self.parse_bit_or();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::BitwiseOr) 
-            ) {
+            if !matches!(operation, Some(Token::BitwiseOr)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -134,10 +125,7 @@ impl Parser {
         let mut term = self.parse_bit_xor();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::Xor) 
-            ) {
+            if !matches!(operation, Some(Token::Xor)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -150,10 +138,7 @@ impl Parser {
         let mut term = self.parse_bit_and();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::BitwiseAnd) 
-            ) {
+            if !matches!(operation, Some(Token::BitwiseAnd)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -166,10 +151,7 @@ impl Parser {
         let mut term = self.parse_equality_expr();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::Equal) | Some(Token::NotEqual) 
-            ) {
+            if !matches!(operation, Some(Token::Equal) | Some(Token::NotEqual)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -184,7 +166,10 @@ impl Parser {
             let operation = self.lexer.peek();
             if !matches!(
                 operation,
-                Some(Token::LessEq) | Some(Token::GreaterEq) | Some(Token::Less) | Some(Token::Greater) 
+                Some(Token::LessEq)
+                    | Some(Token::GreaterEq)
+                    | Some(Token::Less)
+                    | Some(Token::Greater)
             ) {
                 return term;
             }
@@ -200,7 +185,7 @@ impl Parser {
             let operation = self.lexer.peek();
             if !matches!(
                 operation,
-                Some(Token::BitwiseLeftShift) | Some(Token::BitwiseRightShift) 
+                Some(Token::BitwiseLeftShift) | Some(Token::BitwiseRightShift)
             ) {
                 return term;
             }
@@ -214,10 +199,7 @@ impl Parser {
         let mut term = self.parse_add_sub();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::LogicalAnd) 
-            ) {
+            if !matches!(operation, Some(Token::LogicalAnd)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
