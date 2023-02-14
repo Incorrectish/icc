@@ -10,6 +10,15 @@ pub struct AsmInstr {
     arguments: String,
 }
 
+impl Default for AsmInstr {
+    fn default() -> Self {
+        Self {
+            command: String::new(),
+            arguments: String::new(),
+        }
+    }
+}
+
 impl AsmInstr {
     pub fn new(command: String, arguments: String) -> Self {
         Self { command, arguments }
@@ -19,6 +28,14 @@ impl AsmInstr {
         Self {
             command: command.to_string(),
             arguments: arguments.to_string(),
+        }
+    }
+}
+
+impl Default for Asm {
+    fn default() -> Self {
+        Asm {
+            instructions: VecDeque::new(),
         }
     }
 }
@@ -96,6 +113,7 @@ impl Asm {
         self.instructions.push_back(AsmInstr { command, arguments })
     }
 
+    #[allow(unused)]
     pub fn prepend_instruction(&mut self, command: String, arguments: String) {
         self.instructions
             .push_front(AsmInstr { command, arguments })
@@ -106,6 +124,7 @@ impl Asm {
         // The entire following function assumes no command has whitespace after it. eg: it breaks
         // if the command is "pushq " vs "pushq", which is intentional
         let mut last_push = false;
+        // TODO: make this an option
         let mut postfix = '\0';
         for i in (0..self.instructions.len()).rev() {
             let instruction = &self.instructions[i];
@@ -125,9 +144,26 @@ impl Asm {
         }
     }
 
+    #[allow(unused)]
     // TODO: This function turns the instruction at index2 into new_command arg1,arg2 then removes
     // index1
-    fn combine(&mut self, index1: usize, index2: usize, new_command: String) {}
+    // for example if instruction at index1 is `pushl $5`, instruction at index2 is `popl %eax`,
+    // and new_command is `movq`, index1 will be removed, and the instruction at index2 becomes
+    // `movq $5, %eax`
+    // THIS WILL BREAK IF THE ARGUMENT FOR one of them is something like `value, location`, IT
+    // CANNOT HANDLE ARGUMENTS THAT HAVE > 1 arg
+    // This also assumes index1 and index2 are in bounds, it will panic if it is out of bounds
+    fn combine(&mut self, index1: usize, index2: usize, new_command: String) {
+        let instruction1 = self
+            .instructions
+            .remove(index1)
+            .expect("index1 MUST be in bounds");
+        let instruction2 = &self.instructions[index2];
+        self.instructions[index2] = AsmInstr::new(
+            new_command,
+            format!("{},{}", instruction1.arguments, instruction2.arguments),
+        );
+    }
 
     fn optimize_useless_moves(&mut self) {
         // This entire loop simply goes through and removes any movq %reg,%reg

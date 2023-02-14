@@ -1,16 +1,32 @@
 use crate::{
     assembly::{Asm, AsmInstr},
     ast,
-    ast::BinaryOperator,
+    ast::{BinaryOperator, Expression},
+    parser::{fail, Parser},
+    symbol_table::SymbolTable,
 };
 
+pub const LONG_SIZE: u64 = 8;
+pub const INT_SIZE: u64 = 4;
+
+#[allow(dead_code)]
 pub struct AsmGenerator {
     jump_counter: u64,
+    // Going to need a hashmap like variable names: stack position
+    // Suggestion, create a wrapper struct with #[repr(transparent)], so that you
+    // can add a push method, which doesn't modify existing elements, unlike hashmap insert
+    // and restricts access to the inside so it cannot be modified
+    symbol_table: SymbolTable,
+    newest_mem_location: u64,
 }
 
 impl AsmGenerator {
     pub fn new() -> Self {
-        AsmGenerator { jump_counter: 0 }
+        AsmGenerator {
+            jump_counter: 0,
+            symbol_table: SymbolTable::new(),
+            newest_mem_location: 0
+        }
     }
 
     // Generates the assembly from the abstract syntax tree
@@ -23,35 +39,56 @@ impl AsmGenerator {
 
     fn gen_function(&mut self, function_declaration: ast::FuncDecl) -> Asm {
         match function_declaration {
-            ast::FuncDecl::Func(indentifier, statement) => Asm::from_instr(
-                vec![
-                    AsmInstr::new(format!("{indentifier}:"), String::new()),
-                    AsmInstr::new(".globl".to_string(), indentifier.clone()),
-                ],
-                self.gen_statement(statement),
-            ),
+            ast::FuncDecl::Func(indentifier, statements) => {
+                let mut assembly = Asm::default();
+                for statement in statements {
+                    assembly.add_instructions(self.gen_statement(statement));
+                }
+                Asm::from_instr(
+                    vec![
+                        AsmInstr::new("movq".to_string(), "%rsp,%rbp".to_string()),
+                        AsmInstr::new("pushq".to_string(), "%rbp".to_string()),
+                        AsmInstr::new(format!("{indentifier}:"), String::new()),
+                        AsmInstr::new(".globl".to_string(), indentifier),
+                    ],
+                    assembly,
+                )
+            }
         }
     }
 
     fn gen_statement(&mut self, statement: ast::Statement) -> Asm {
         match statement {
             // parses the statements
-            ast::Statement::Return(expr) => {
+            ast::Statement::Return(expression) => {
                 let constructed_assembly = Asm::new(
-                    self.gen_expression(expr),
+                    self.gen_expression(expression),
                     vec![AsmInstr::from("popq", "%rax"), AsmInstr::from("ret", "")],
                 );
-                // TODO: if the assembly pushes something onto to the stack only to immediately pop
-                // it off onto %eax, replace it with just moving to eax. For example
-                // pushl $5
-                // neg (esp)
-                // popl %eax
-                // ret
-                // can become:
-                // movl $5, %eax
-                // neg %eax
-                // ret
                 constructed_assembly
+            }
+            ast::Statement::Declare(name, optional_expression) => {
+                if let Some(expression) = optional_expression {
+                    let location = self.gen_location(LONG_SIZE);
+                    let constructed_assembly = Asm::new(
+                        self.gen_expression(expression),
+                        vec![
+                            AsmInstr::from("popq", "%rax"),
+                            AsmInstr::from("movq", &format!("%rax,{location}")),
+                        ],
+                    );
+                    self.symbol_table.add(name, location);
+                    constructed_assembly
+                } else {
+                    let location = self.gen_location(LONG_SIZE);
+                    // TODO: figure out default for declare without initialization
+                    let asm = Asm::instruction("movq".into(), format!("$0, {location}"));
+                    self.symbol_table.add(name, location);
+                    asm
+                }
+            }
+            ast::Statement::Expression(expression) => {
+                self.gen_expression(expression)
             }
         }
     }
@@ -67,103 +104,130 @@ impl AsmGenerator {
                 asm
             }
             ast::Expression::BinaryOp(binary_operator, left_expr, right_expr) => {
-                let mut left_exp = self.gen_expression(*left_expr);
-                let right_exp = self.gen_expression(*right_expr);
-                left_exp.add_instructions(right_exp);
-                let binop = if !matches!(binary_operator, BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr) {
-                    Self::binary_operation(&binary_operator)
+                self.gen_binary_operation_expression(binary_operator, left_expr, right_expr)
+            }
+            ast::Expression::Assign(name, expression) => {
+                let asm = self.gen_expression(*expression);
+                let optional_location = self.symbol_table.get(&name);
+                if let Some(location) = optional_location {
+                    Asm::new(asm, vec![AsmInstr::from("popq", "%rax"), AsmInstr::new("movq".into(), format!("%rax,{location}"))])
                 } else {
-                    String::new()
-                };
-                if matches!(binary_operator, BinaryOperator::Divide) {
-                    left_exp.append_instruction("popq".into(), "%rbx".into());
-                    left_exp.append_instruction("popq".into(), "%rax".into());
-                    left_exp.append_instruction("cqo".into(), String::new());
-                    left_exp.append_instruction(binop, "%rbx".into());
-                    left_exp.append_instruction("pushq".into(), "%rax".into());
-                } else if matches!(binary_operator, BinaryOperator::Multiply) {
-                    // TODO: result is actually not just in rax, but in two registers potentially so
-                    // see that that is fixed
-                    left_exp.append_instruction("popq".into(), "%rbx".into());
-                    left_exp.append_instruction("popq".into(), "%rax".into());
-                    left_exp.append_instruction(binop, "%rbx,%rax".into());
-                    left_exp.append_instruction("pushq".into(), "%rax".into());
-                } else if matches!(binary_operator, BinaryOperator::Modulo) {
-                    left_exp.append_instruction("popq".into(), "%rbx".into());
-                    left_exp.append_instruction("popq".into(), "%rax".into());
-                    left_exp.append_instruction("cqo".into(), String::new());
-                    left_exp.append_instruction(binop, "%rbx".into());
-                    left_exp.append_instruction("pushq".into(), "%rdx".into());
-                } else if matches!(
-                    binary_operator,
-                    BinaryOperator::BitwiseLeftShift | BinaryOperator::BitwiseRightShift
-                ) {
-                    // TODO: maybe clear the rcx register?
-                    left_exp.append_instruction("popq".into(), "%rcx".into());
-                    left_exp.append_instruction(binop, "%rcx,(%rsp)".into());
-                } else if matches!(
-                    binary_operator,
-                    BinaryOperator::Equal
-                        | BinaryOperator::NotEqual
-                        | BinaryOperator::LessEq
-                        | BinaryOperator::GreaterEq
-                        | BinaryOperator::Less
-                        | BinaryOperator::Greater
-                ) {
-                    left_exp.append_instruction("popq".into(), "%rbx".into());
-                    left_exp.append_instruction("popq".into(), "%rax".into());
-                    left_exp.append_instruction("cmpq".into(), "%rax,%rbx".into());
-                    left_exp.append_instruction(binop, "%rax".into());
-                    left_exp.append_instruction("pushq".into(), "%rax".into());
-                } else if matches!(binary_operator, BinaryOperator::LogicalOr) {
-                    left_exp.append_instruction("popq".into(), "%rbx".into());
-                    left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
-                    let label1_name = self.gen_new_label("logicaljump");
-                    let label1 = format!("{label1_name}:");
-                    let label2_name = self.gen_new_label("logicaljump");
-                    let label2 = format!("{label2_name}:");
-                    let label3_name = self.gen_new_label("logicaljump");
-                    let label3 = format!("{label3_name}:");
-                    left_exp.append_instruction("jne".into(), label1_name);
-                    left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
-                    left_exp.append_instruction("je".into(), label2_name);
-                    left_exp.append_instruction(label1, "".into());
-                    left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
-                    left_exp.append_instruction("jmp".into(), label3_name);
-                    left_exp.append_instruction(label2, "".into());
-                    left_exp.append_instruction("movq".into(), "$0,(%rsp)".into());
-                    left_exp.append_instruction(label3, "".into());
-                } else if matches!(binary_operator, BinaryOperator::LogicalAnd) {
-                    left_exp.append_instruction("popq".into(), "%rbx".into());
-                    left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
-                    let label1_name = self.gen_new_label("logicaljump");
-                    let label1 = format!("{label1_name}:");
-                    let label2_name = self.gen_new_label("logicaljump");
-                    let label2 = format!("{label2_name}:");
-                    let label3_name = self.gen_new_label("logicaljump");
-                    let label3 = format!("{label3_name}:");
-                    left_exp.append_instruction("je".into(), label1_name.clone());
-                    left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
-                    left_exp.append_instruction("je".into(), label1_name);
-                    left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
-                    left_exp.append_instruction("jmp".into(), label2_name);
-                    left_exp.append_instruction(label1, "".into());
-                    left_exp.append_instruction("movq".into(), "$0,(%rsp)".into());
-                    left_exp.append_instruction(label2, "".into());
-                } else {
-                    // Note the following might be a bit of a premature optimization. I assume that the
-                    // size of the data is 4 bytes, so I can read the first two values off the stack
-                    // into a register, and then operate on them and write them back to the stack,
-                    // minimizing push/pop instructions
-                    left_exp.append_instruction("popq".into(), "%rax".into());
-                    left_exp.append_instruction(binop, "%rax,(%rsp)".into());
-                    // format!(
-                    //     "{left_exp}\n{right_exp}\npopl %eax\npopl %ebx\n{binop} %ebx, %eax\npushl %eax"
-                    // )
+                    fail(format!("exp(assign)\nVariable \"{name}\" referenced but not declared"));
                 }
-                left_exp
+            }
+            ast::Expression::ReferenceVariable(name) => {
+                let optional_location = self.symbol_table.get(&name);
+                if let Some(location) = optional_location {
+                    Asm::instruction("pushq".into(), location.clone())
+                } else {
+                    fail(format!("Variable \"{name}\" referenced but not declared"));
+                }
             }
         }
+    }
+
+    fn gen_binary_operation_expression(
+        &mut self,
+        binary_operator: BinaryOperator,
+        left_expr: Box<Expression>,
+        right_expr: Box<Expression>,
+    ) -> Asm {
+        let mut left_exp = self.gen_expression(*left_expr);
+        let right_exp = self.gen_expression(*right_expr);
+        left_exp.add_instructions(right_exp);
+        let binop = if !matches!(
+            binary_operator,
+            BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr
+        ) {
+            Self::binary_operation(&binary_operator)
+        } else {
+            String::new()
+        };
+        if matches!(binary_operator, BinaryOperator::Divide) {
+            left_exp.append_instruction("popq".into(), "%rbx".into());
+            left_exp.append_instruction("popq".into(), "%rax".into());
+            left_exp.append_instruction("cqo".into(), String::new());
+            left_exp.append_instruction(binop, "%rbx".into());
+            left_exp.append_instruction("pushq".into(), "%rax".into());
+        } else if matches!(binary_operator, BinaryOperator::Multiply) {
+            // TODO: result is actually not just in rax, but in two registers potentially so
+            // see that that is fixed
+            left_exp.append_instruction("popq".into(), "%rbx".into());
+            left_exp.append_instruction("popq".into(), "%rax".into());
+            left_exp.append_instruction(binop, "%rbx,%rax".into());
+            left_exp.append_instruction("pushq".into(), "%rax".into());
+        } else if matches!(binary_operator, BinaryOperator::Modulo) {
+            left_exp.append_instruction("popq".into(), "%rbx".into());
+            left_exp.append_instruction("popq".into(), "%rax".into());
+            left_exp.append_instruction("cqo".into(), String::new());
+            left_exp.append_instruction(binop, "%rbx".into());
+            left_exp.append_instruction("pushq".into(), "%rdx".into());
+        } else if matches!(
+            binary_operator,
+            BinaryOperator::BitwiseLeftShift | BinaryOperator::BitwiseRightShift
+        ) {
+            // TODO: maybe clear the rcx register?
+            left_exp.append_instruction("popq".into(), "%rcx".into());
+            left_exp.append_instruction(binop, "%rcx,(%rsp)".into());
+        } else if matches!(
+            binary_operator,
+            BinaryOperator::Equal
+                | BinaryOperator::NotEqual
+                | BinaryOperator::LessEq
+                | BinaryOperator::GreaterEq
+                | BinaryOperator::Less
+                | BinaryOperator::Greater
+        ) {
+            left_exp.append_instruction("popq".into(), "%rbx".into());
+            left_exp.append_instruction("popq".into(), "%rax".into());
+            left_exp.append_instruction("cmpq".into(), "%rax,%rbx".into());
+            left_exp.append_instruction(binop, "%rax".into());
+            left_exp.append_instruction("pushq".into(), "%rax".into());
+        } else if matches!(binary_operator, BinaryOperator::LogicalOr) {
+            left_exp.append_instruction("popq".into(), "%rbx".into());
+            left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+            let label1_name = self.gen_new_label("logicaljump");
+            let label1 = format!("{label1_name}:");
+            let label2_name = self.gen_new_label("logicaljump");
+            let label2 = format!("{label2_name}:");
+            let label3_name = self.gen_new_label("logicaljump");
+            let label3 = format!("{label3_name}:");
+            left_exp.append_instruction("jne".into(), label1_name);
+            left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
+            left_exp.append_instruction("je".into(), label2_name);
+            left_exp.append_instruction(label1, "".into());
+            left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
+            left_exp.append_instruction("jmp".into(), label3_name);
+            left_exp.append_instruction(label2, "".into());
+            left_exp.append_instruction("movq".into(), "$0,(%rsp)".into());
+            left_exp.append_instruction(label3, "".into());
+        } else if matches!(binary_operator, BinaryOperator::LogicalAnd) {
+            left_exp.append_instruction("popq".into(), "%rbx".into());
+            left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+            let label1_name = self.gen_new_label("logicaljump");
+            let label1 = format!("{label1_name}:");
+            let label2_name = self.gen_new_label("logicaljump");
+            let label2 = format!("{label2_name}:");
+            left_exp.append_instruction("je".into(), label1_name.clone());
+            left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
+            left_exp.append_instruction("je".into(), label1_name);
+            left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
+            left_exp.append_instruction("jmp".into(), label2_name);
+            left_exp.append_instruction(label1, "".into());
+            left_exp.append_instruction("movq".into(), "$0,(%rsp)".into());
+            left_exp.append_instruction(label2, "".into());
+        } else {
+            // Note the following might be a bit of a premature optimization. I assume that the
+            // size of the data is 4 bytes, so I can read the first two values off the stack
+            // into a register, and then operate on them and write them back to the stack,
+            // minimizing push/pop instructions
+            left_exp.append_instruction("popq".into(), "%rax".into());
+            left_exp.append_instruction(binop, "%rax,(%rsp)".into());
+            // format!(
+            //     "{left_exp}\n{right_exp}\npopl %eax\npopl %ebx\n{binop} %ebx, %eax\npushl %eax"
+            // )
+        }
+        left_exp
     }
 
     fn operation(operator: ast::UnaryOperator) -> Asm {
@@ -215,8 +279,12 @@ impl AsmGenerator {
             ast::BinaryOperator::NotEqual => "setne".to_string(),
             ast::BinaryOperator::Equal => "sete".to_string(),
 
-            ast::BinaryOperator::LogicalAnd => unreachable!("You should not use this function on a logical and input"),
-            ast::BinaryOperator::LogicalOr =>  unreachable!("You should not use this function on a logical or input"),
+            ast::BinaryOperator::LogicalAnd => {
+                unreachable!("You should not use this function on a logical and input")
+            }
+            ast::BinaryOperator::LogicalOr => {
+                unreachable!("You should not use this function on a logical or input")
+            }
         }
     }
 
@@ -224,5 +292,10 @@ impl AsmGenerator {
         let label = format!(".{label_identifier}{}", self.jump_counter);
         self.jump_counter += 1;
         label
+    }
+
+    fn gen_location(&mut self, allocation: u64) -> String {
+        self.newest_mem_location += allocation;
+        format!("-{}(%rbp)", self.newest_mem_location)
     }
 }

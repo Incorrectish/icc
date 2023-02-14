@@ -42,16 +42,20 @@ pub enum Expression {
     Constant(i32),
     UnaryOp(UnaryOperator, Box<Expression>),
     BinaryOp(BinaryOperator, Box<Expression>, Box<Expression>),
+    Assign(String, Box<Expression>),
+    ReferenceVariable(String),
 }
 
 #[derive(Debug)]
 pub enum Statement {
     Return(Expression),
+    Declare(String, Option<Expression>),
+    Expression(Expression),
 }
 
 #[derive(Debug)]
 pub enum FuncDecl {
-    Func(String, Statement),
+    Func(String, Vec<Statement>),
 }
 
 #[derive(Debug)]
@@ -74,9 +78,11 @@ impl FuncDecl {
     fn print(&self, depth: usize) {
         let indentation = INDENT.repeat(depth);
         match self {
-            FuncDecl::Func(ref indentifier, ref statement) => {
+            FuncDecl::Func(ref indentifier, ref statements) => {
                 println!("{indentation}fn {indentifier} -> int\n{indentation}params: ()\n{indentation}body:");
-                statement.print(2);
+                for statement in statements {
+                    statement.print(2);
+                }
             }
         }
     }
@@ -89,6 +95,20 @@ impl Statement {
             Statement::Return(ref exp) => {
                 print!("{indentation}return ");
                 exp.print();
+            }
+            Statement::Declare(name, expression) => {
+                if let Some(expr) = expression {
+                    print!("{indentation}int {name} = ");
+                    expr.print();
+                    println!();
+                } else {
+                    println!("{indentation}int {name}");
+                }
+            }
+            Statement::Expression(expr) => {
+                print!("{indentation}");
+                expr.print();
+                println!();
             }
         }
     }
@@ -110,14 +130,16 @@ impl Expression {
                 right_expr.print();
                 print!(")");
             }
+            Expression::Assign(name, expression) => {
+                // TODO: Maybe change so it doesn't always print "(" and only does it for
+                // expressions, not assignment expressions
+                print!("({name} = ");
+                expression.print();
+                print!(")");
+            }
+            Expression::ReferenceVariable(name) => print!("var<{name}>"),
         }
     }
-
-    // fn gen_assembly(&self) -> String {
-    //     match self {
-    //         Expression::Constant()
-    //     }
-    // }
 }
 
 impl BinaryOperator {}

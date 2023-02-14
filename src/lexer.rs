@@ -55,12 +55,46 @@ impl Lexer {
             ')' => Some(Token::CloseParen),
             ';' => Some(Token::Semicolon),
             '~' => Some(Token::BitwiseComplement),
-            '-' => Some(Token::Minus),
-            '+' => Some(Token::Add),
-            '*' => Some(Token::Multiply),
-            '/' => Some(Token::Divide),
-            '%' => Some(Token::Modulo),
-            '^' => Some(Token::Xor),
+            '-' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::MinusAssign)
+                } else {
+                    Some(Token::Minus)
+                }
+            }
+            '+' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::AddAssign)
+                } else {
+                    Some(Token::Add)
+                }
+            }
+            '*' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::MulAssign)
+                } else {
+                    Some(Token::Multiply)
+                }
+            }
+            '/' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::DivAssign)
+                } else {
+                    Some(Token::Divide)
+                }
+            }
+            '^' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::XorAssign)
+                } else {
+                    Some(Token::Xor)
+                }
+            }
             '!' => {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
@@ -91,7 +125,13 @@ impl Lexer {
                     Some(Token::GreaterEq)
                 } else if next_char == Some(&('>' as u8)) {
                     self.pos += 1;
-                    Some(Token::BitwiseRightShift)
+                    let third_char = self.input.as_bytes().get(self.pos);
+                    if third_char == Some(&('=' as u8)) {
+                        self.pos += 1;
+                        Some(Token::BitwiseRightShiftAssign)
+                    } else {
+                        Some(Token::BitwiseRightShift)
+                    }
                 } else {
                     Some(Token::Greater)
                 }
@@ -102,7 +142,13 @@ impl Lexer {
                     Some(Token::LessEq)
                 } else if next_char == Some(&('<' as u8)) {
                     self.pos += 1;
-                    Some(Token::BitwiseLeftShift)
+                    let third_char = self.input.as_bytes().get(self.pos);
+                    if third_char == Some(&('=' as u8)) {
+                        self.pos += 1;
+                        Some(Token::BitwiseLeftShiftAssign)
+                    } else {
+                        Some(Token::BitwiseLeftShift)
+                    }
                 } else {
                     Some(Token::Less)
                 }

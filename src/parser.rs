@@ -5,6 +5,12 @@ use crate::{
     token::Token,
 };
 
+// does exactly what you think
+pub fn fail(message: String) -> ! {
+    eprintln!("{}: {message}", "Error".bold().red());
+    std::process::exit(0);
+}
+
 use colored::Colorize;
 
 pub struct Parser {
@@ -16,12 +22,6 @@ impl Parser {
         Parser { lexer }
     }
 
-    // does exactly what you think
-    fn fail(message: String) -> ! {
-        eprintln!("{}: {message}", "Error".bold().red());
-        std::process::exit(0);
-    }
-
     // begins the parsing process from the input lexer
     pub fn parse(&mut self) -> ast::Prog {
         ast::Prog::Prog(self.parse_func())
@@ -31,57 +31,122 @@ impl Parser {
     fn parse_func(&mut self) -> ast::FuncDecl {
         let token = self.lexer.next().expect("Missing return type");
         if !matches!(token, Token::KeywordInt) {
-            Self::fail(format!("Needs int return type, got {token:?}"));
+            fail(format!("Needs int return type, got {token:?}"));
         }
 
         let token = self.lexer.next().expect("Missing function name");
         let indentifier = if let Token::Identifier(ident) = token {
             ident
         } else {
-            Self::fail(format!("Needs int return type, got {token:?}"));
+            fail(format!("Needs int return type, got {token:?}"));
         };
 
         let token = self.lexer.next().expect("Missing opening parentheses");
         if !matches!(token, Token::OpenParen) {
-            Self::fail(format!("Needs opening parentheses, got {token:?}"));
+            fail(format!("Needs opening parentheses, got {token:?}"));
         }
 
         let token = self.lexer.next().expect("Missing closing parentheses");
         if !matches!(token, Token::CloseParen) {
-            Self::fail(format!("Needs closing parentheses, got {token:?}"));
+            fail(format!("Needs closing parentheses, got {token:?}"));
         }
 
         let token = self.lexer.next().expect("Missing opening brace");
         if !matches!(token, Token::OpenBrace) {
-            Self::fail(format!("Needs opening brace, got {token:?}"));
+            fail(format!("Needs opening brace, got {token:?}"));
         }
 
-        let statement = self.parse_statement();
+        // TODO: fix this in case it is not working
+
+        let mut statements = vec![];
+        while let Some(statement) = self.parse_statement() {
+            statements.push(statement);
+        }
 
         let token = self.lexer.next().expect("Missing closing brace");
         if !matches!(token, Token::CloseBrace) {
-            Self::fail(format!("Needs closing brace, got {token:?}"));
+            fail(format!("Needs closing brace, got {token:?}"));
         }
 
-        ast::FuncDecl::Func(indentifier, statement)
+        ast::FuncDecl::Func(indentifier, statements)
     }
 
-    fn parse_statement(&mut self) -> ast::Statement {
-        let token = self.lexer.next().expect("Invalid token sequence");
-        if !matches!(token, Token::KeywordReturn) {
-            Self::fail(format!("Needs return keyword, got {token:?}"));
+    fn parse_statement(&mut self) -> Option<ast::Statement> {
+        // let token = self.lexer.next().expect("Invalid token sequence");
+        let token = self.lexer.peek().expect("Invalid token sequence");
+        if matches!(token, Token::CloseBrace) {
+            return None;
+        }
+
+        match token {
+            Token::KeywordReturn => Some(self.parse_return_statement()),
+            Token::KeywordInt => Some(self.parse_assignment_statement()),
+            Token::Identifier(_) => Some(self.parse_expression_statement()),
+            Token::IntegerLiteral(_) => Some(self.parse_expression_statement()),
+            _ => panic!("Is this the token: {token:?}?"),
+        }
+    }
+
+    fn parse_expression_statement(&mut self) -> ast::Statement {
+        let statement = self.parse_expression();
+        let token = self.lexer.next().expect("Missing semicolon");
+        if !matches!(token, Token::Semicolon) {
+            fail(format!("Needs semicolon, got {token:?}"));
+        }
+        ast::Statement::Expression(statement)
+    }
+
+    fn parse_return_statement(&mut self) -> ast::Statement {
+        if !matches!(
+            self.lexer
+                .next()
+                .expect("This should always be a return keyword"),
+            Token::KeywordReturn
+        ) {
+            fail("This should always be the return keyword".into());
         }
         let exp = self.parse_expression();
         let statement = ast::Statement::Return(exp);
-        let statement = dbg!(statement);
         let token = self.lexer.next().expect("Invalid token sequence");
         if !matches!(token, Token::Semicolon) {
-            Self::fail(format!("Needs semicolon, got {token:?}"));
+            fail(format!("Needs semicolon, got {token:?}"));
         }
         statement
     }
 
-    // TODO: Error messages
+    fn parse_assignment_statement(&mut self) -> ast::Statement {
+        if !matches!(
+            self.lexer
+                .next()
+                .expect("This should always be a int keyword"),
+            Token::KeywordInt
+        ) {
+            fail("This should always be the int keyword".into());
+        }
+        let token = self.lexer.next().expect("Invalid token sequence");
+        if let Token::Identifier(variable_name) = token {
+            let token = self.lexer.next().expect("Invalid token sequence");
+            if let Token::Semicolon = token {
+                ast::Statement::Declare(variable_name, None)
+            } else if let Token::Assign = token {
+                let exp = self.parse_expression();
+                let statement = ast::Statement::Declare(variable_name, Some(exp));
+                let token = self.lexer.next().expect("Invalid token sequence");
+                if !matches!(token, Token::Semicolon) {
+                    fail(format!("Needs semicolon, got {token:?}"));
+                }
+                statement
+            } else {
+                fail(format!(
+                    "Expected assignment operator[=] or end of statement[;], got {token:?}"
+                ));
+            }
+        } else {
+            fail(format!("Expected variable name, got {token:?}"));
+        }
+    }
+
+    // TODO: Error messages, error messages
     fn parse_expression(&mut self) -> ast::Expression {
         let mut term = self.parse_logical_or();
         loop {
@@ -220,6 +285,7 @@ impl Parser {
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
+
     fn parse_term(&mut self) -> ast::Expression {
         let mut term = self.parse_factor();
         loop {
@@ -255,11 +321,21 @@ impl Parser {
                 let expression = self.parse_expression();
                 let next_token = self.lexer.next();
                 if !matches!(next_token, Some(Token::CloseParen)) {
-                    Self::fail(format!("Token must be an closing parentheses, instead got {next_token:?}"));
+                    fail(format!("Token must be an closing parentheses, instead got {next_token:?}"));
                 }
                 expression
+            },
+            Some(Token::Identifier(name)) => {
+                let next_token = self.lexer.peek();
+                if !matches!(next_token, Some(Token::Assign)) {
+                    // fail(format!("Token must be assignment[=], instead got {next_token:?}"));
+                    ast::Expression::ReferenceVariable(name)
+                } else {
+                    let _ = self.lexer.next();
+                    ast::Expression::Assign(name, Box::new(self.parse_expression()))
+                }
             }
-            _ => Self::fail(format!("Token must be an expression, instead got {token:?}")),
+            _ => fail(format!("Token must be an expression, instead got {token:?}")),
         }
     }
 

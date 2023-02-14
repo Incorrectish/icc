@@ -1,16 +1,12 @@
-use crate::{assembly::*, lexer::Lexer, parser::Parser, asm_gen::AsmGenerator};
-use std::{
-    env,
-    fs::{self, write},
-    path::Path,
-    process::Command,
-};
+use crate::{asm_gen::AsmGenerator, assembly::*, lexer::Lexer, parser::Parser};
+use std::{env, fs, path::Path, process::Command};
 
 mod asm_gen;
 mod assembly;
 mod ast;
 mod lexer;
 mod parser;
+mod symbol_table;
 mod token;
 
 fn main() {
@@ -18,7 +14,7 @@ fn main() {
     // argument will be the filename given to the compiler
     let filename = env::args().nth(1).expect("Please provide a file to lex");
     // test_lexer(Path::new(&filename));
-    test_ast(Path::new(&filename));
+    // test_ast(Path::new(&filename));
     compile(Path::new(&filename));
 }
 
@@ -31,7 +27,7 @@ fn compile(filename: &Path) {
     let asm = AsmGenerator::new().generate(ast);
 
     let asm_file = filename.with_extension("s");
-    Asm::write(asm, &asm_file);
+    let Ok(_) = Asm::write(asm, &asm_file) else {panic!("Could not write to assembly file")};
 
     let parent_path = filename.parent().unwrap_or(Path::new(""));
     dbg!(Command::new("gcc")
