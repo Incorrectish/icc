@@ -25,7 +25,7 @@ impl AsmGenerator {
         AsmGenerator {
             jump_counter: 0,
             symbol_table: SymbolTable::new(),
-            newest_mem_location: 0
+            newest_mem_location: 0,
         }
     }
 
@@ -43,6 +43,10 @@ impl AsmGenerator {
                 let mut assembly = Asm::default();
                 for statement in statements {
                     assembly.add_instructions(self.gen_statement(statement));
+                }
+                if assembly.last().command() != "ret" {
+                    assembly.append_instruction("movq".into(), "$0,%eax".into());
+                    assembly.append_instruction("ret".into(), String::new());
                 }
                 Asm::from_instr(
                     vec![
@@ -87,9 +91,7 @@ impl AsmGenerator {
                     asm
                 }
             }
-            ast::Statement::Expression(expression) => {
-                self.gen_expression(expression)
-            }
+            ast::Statement::Expression(expression) => self.gen_expression(expression),
         }
     }
 
@@ -110,9 +112,18 @@ impl AsmGenerator {
                 let asm = self.gen_expression(*expression);
                 let optional_location = self.symbol_table.get(&name);
                 if let Some(location) = optional_location {
-                    Asm::new(asm, vec![AsmInstr::from("popq", "%rax"), AsmInstr::new("movq".into(), format!("%rax,{location}"))])
+                    Asm::new(
+                        asm,
+                        vec![
+                            AsmInstr::from("popq", "%rax"),
+                            AsmInstr::new("movq".into(), format!("%rax,{location}")),
+                            AsmInstr::from("pushq", "%rax"),
+                        ],
+                    )
                 } else {
-                    fail(format!("exp(assign)\nVariable \"{name}\" referenced but not declared"));
+                    fail(format!(
+                        "exp(assign)\nVariable \"{name}\" referenced but not declared"
+                    ));
                 }
             }
             ast::Expression::ReferenceVariable(name) => {

@@ -30,6 +30,10 @@ impl AsmInstr {
             arguments: arguments.to_string(),
         }
     }
+
+    pub fn command(&self) -> &str {
+        &self.command
+    }
 }
 
 impl Default for Asm {
@@ -84,6 +88,10 @@ impl Asm {
         assembly
     }
 
+    pub fn last(&self) -> &AsmInstr {
+        &self.instructions[self.instructions.len() - 1]
+    }
+
     pub fn write(mut assembly: Asm, to: &Path) -> std::io::Result<()> {
         assembly.optimize_push_pop();
         assembly.optimize_useless_moves();
@@ -103,6 +111,9 @@ impl Asm {
     // In addition, if you see a movq ${int},{register}
     // then immediately binop {register},{location}, you could optimize that to binop
     // ${int},{location}
+    // Can also optimize double moves:
+    // movq $3,%rax
+    // movq %rax,-8(%rbp)
 
     pub fn add_instructions(&mut self, mut more_instructions: Asm) {
         self.instructions

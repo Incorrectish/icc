@@ -59,8 +59,8 @@ impl Parser {
         // TODO: fix this in case it is not working
 
         let mut statements = vec![];
-        while let Some(statement) = self.parse_statement() {
-            statements.push(statement);
+        while let Some(mut statement) = self.parse_statement() {
+            statements.append(&mut statement);
         }
 
         let token = self.lexer.next().expect("Missing closing brace");
@@ -71,7 +71,7 @@ impl Parser {
         ast::FuncDecl::Func(indentifier, statements)
     }
 
-    fn parse_statement(&mut self) -> Option<ast::Statement> {
+    fn parse_statement(&mut self) -> Option<Vec<ast::Statement>> {
         // let token = self.lexer.next().expect("Invalid token sequence");
         let token = self.lexer.peek().expect("Invalid token sequence");
         if matches!(token, Token::CloseBrace) {
@@ -79,10 +79,13 @@ impl Parser {
         }
 
         match token {
-            Token::KeywordReturn => Some(self.parse_return_statement()),
-            Token::KeywordInt => Some(self.parse_assignment_statement()),
-            Token::Identifier(_) => Some(self.parse_expression_statement()),
-            Token::IntegerLiteral(_) => Some(self.parse_expression_statement()),
+            Token::KeywordReturn => Some(vec![self.parse_return_statement()]),
+            Token::KeywordInt => {
+                let _ = self.lexer.next();
+                Some(self.parse_assignment_statement())
+            }
+            Token::Identifier(_) => Some(vec![self.parse_expression_statement()]),
+            Token::IntegerLiteral(_) => Some(vec![self.parse_expression_statement()]),
             _ => panic!("Is this the token: {token:?}?"),
         }
     }
@@ -91,7 +94,7 @@ impl Parser {
         let statement = self.parse_expression();
         let token = self.lexer.next().expect("Missing semicolon");
         if !matches!(token, Token::Semicolon) {
-            fail(format!("Needs semicolon, got {token:?}"));
+            fail(format!("(within expression)Needs semicolon, got {token:?}"));
         }
         ast::Statement::Expression(statement)
     }
@@ -114,28 +117,39 @@ impl Parser {
         statement
     }
 
-    fn parse_assignment_statement(&mut self) -> ast::Statement {
-        if !matches!(
-            self.lexer
-                .next()
-                .expect("This should always be a int keyword"),
-            Token::KeywordInt
-        ) {
-            fail("This should always be the int keyword".into());
-        }
+    fn parse_assignment_statement(&mut self) -> Vec<ast::Statement> {
+        // if !matches!(
+        //     self.lexer
+        //         .next()
+        //         .expect("This should always be a int keyword"),
+        //     Token::KeywordInt
+        // ) {
+        //     fail("This should always be the int keyword".into());
+        // }
         let token = self.lexer.next().expect("Invalid token sequence");
         if let Token::Identifier(variable_name) = token {
             let token = self.lexer.next().expect("Invalid token sequence");
             if let Token::Semicolon = token {
-                ast::Statement::Declare(variable_name, None)
+                vec![ast::Statement::Declare(variable_name, None)]
             } else if let Token::Assign = token {
                 let exp = self.parse_expression();
                 let statement = ast::Statement::Declare(variable_name, Some(exp));
                 let token = self.lexer.next().expect("Invalid token sequence");
-                if !matches!(token, Token::Semicolon) {
-                    fail(format!("Needs semicolon, got {token:?}"));
+                if matches!(token, Token::Semicolon) {
+                    vec![statement]
+                } else if matches!(token, Token::Comma) {
+                    let mut statements = vec![statement];
+                    statements.append(&mut self.parse_assignment_statement());
+                    statements
+                } else {
+                    fail(format!(
+                        "(within assignment) Needs semicolon, got {token:?}"
+                    ));
                 }
-                statement
+            } else if let Token::Comma = token {
+                let mut statements = vec![ast::Statement::Declare(variable_name, None)];
+                statements.append(&mut self.parse_assignment_statement());
+                statements
             } else {
                 fail(format!(
                     "Expected assignment operator[=] or end of statement[;], got {token:?}"
@@ -327,12 +341,16 @@ impl Parser {
             },
             Some(Token::Identifier(name)) => {
                 let next_token = self.lexer.peek();
-                if !matches!(next_token, Some(Token::Assign)) {
-                    // fail(format!("Token must be assignment[=], instead got {next_token:?}"));
-                    ast::Expression::ReferenceVariable(name)
-                } else {
+                if matches!(next_token, Some(Token::Assign)) {
                     let _ = self.lexer.next();
                     ast::Expression::Assign(name, Box::new(self.parse_expression()))
+                } else if matches!(next_token, Some(Token::AddAssign) | Some(Token::MulAssign) | Some(Token::ModAssign) | Some(Token::MinusAssign) | Some(Token::BitwiseAndAssign) | Some(Token::BitwiseOrAssign) | Some(Token::BitwiseLeftShiftAssign) | Some(Token::BitwiseRightShift) | Some(Token::XorAssign) ) {
+                    let _ = self.lexer.next();
+                    let binary_operator = match next_token { Some(Token::AddAssign) => BinaryOperator::Add  ,| Some(Token::MulAssign) => BinaryOperator::Multiply  ,| Some(Token::ModAssign) => BinaryOperator::Modulo  ,| Some(Token::MinusAssign) => BinaryOperator::Minus  ,| Some(Token::BitwiseAndAssign) => BinaryOperator::BitwiseAnd  ,| Some(Token::BitwiseOrAssign) => BinaryOperator::BitwiseOr  ,| Some(Token::BitwiseLeftShiftAssign) => BinaryOperator::BitwiseLeftShift  ,| Some(Token::BitwiseRightShiftAssign) => BinaryOperator::BitwiseRightShift  ,| Some(Token::XorAssign) => BinaryOperator::Xor, _ => unreachable!(), };
+                    ast::Expression::Assign(name.clone(), Box::new(ast::Expression::BinaryOp(binary_operator, Box::new(ast::Expression::ReferenceVariable(name)), Box::new(self.parse_expression()))))
+                } else {
+                    // fail(format!("Token must be assignment[=], instead got {next_token:?}"));
+                    ast::Expression::ReferenceVariable(name)
                 }
             }
             _ => fail(format!("Token must be an expression, instead got {token:?}")),

@@ -1,3 +1,4 @@
+use crate::parser::fail;
 use std::collections::HashMap;
 
 #[repr(transparent)]
@@ -11,7 +12,11 @@ impl SymbolTable {
     }
 
     pub fn add(&mut self, name: String, location: String) {
-        self.0.insert(name, location);
+        if !self.0.contains_key(&name) {
+            self.0.insert(name, location);
+        } else {
+            fail(format!("Duplicate variable {name}, declared already"));
+        }
     }
 
     pub fn remove(&mut self, name: &String) {

@@ -55,12 +55,23 @@ impl Lexer {
             ')' => Some(Token::CloseParen),
             ';' => Some(Token::Semicolon),
             '~' => Some(Token::BitwiseComplement),
+            ',' => Some(Token::Comma),
+            ':' => Some(Token::Colon),
+            '?' => Some(Token::Question),
             '-' => {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
                     Some(Token::MinusAssign)
                 } else {
                     Some(Token::Minus)
+                }
+            }
+            '%' => {
+                if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::ModAssign)
+                } else {
+                    Some(Token::Modulo)
                 }
             }
             '+' => {
@@ -107,6 +118,9 @@ impl Lexer {
                 if next_char == Some(&('&' as u8)) {
                     self.pos += 1;
                     Some(Token::LogicalAnd)
+                } else if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::BitwiseAndAssign)
                 } else {
                     Some(Token::BitwiseAnd)
                 }
@@ -115,6 +129,9 @@ impl Lexer {
                 if next_char == Some(&('|' as u8)) {
                     self.pos += 1;
                     Some(Token::LogicalOr)
+                } else if next_char == Some(&('=' as u8)) {
+                    self.pos += 1;
+                    Some(Token::BitwiseOrAssign)
                 } else {
                     Some(Token::BitwiseOr)
                 }
@@ -215,6 +232,9 @@ impl Lexer {
                 | '^'
                 | '&'
                 | '|'
+                | ','
+                | ':'
+                | '?'
         )
     }
 

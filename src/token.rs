@@ -33,6 +33,8 @@ pub enum Token {
     Greater,                 // >
     Less,                    // <
     Assign,                  // =
+    Colon,                   // :
+    Question,                //?
     Comma,                   // ,
     PrefixIncrement,         // ++
     PostfixIncrement,        // ++
