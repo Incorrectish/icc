@@ -1,7 +1,5 @@
 int main() {
-    int a, d;
-    int b = 3;
-    a += 3;
-    int c = 4 * (a = b);
-    return c << 3 && 5 + a % b;
+    int a = 5, b, c = 7;
+    b = ((a += 3) % c );
+    return b % 5;
 }

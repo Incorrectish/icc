@@ -67,7 +67,13 @@ impl AsmGenerator {
             ast::Statement::Return(expression) => {
                 let constructed_assembly = Asm::new(
                     self.gen_expression(expression),
-                    vec![AsmInstr::from("popq", "%rax"), AsmInstr::from("ret", "")],
+                    vec![
+                        /* AsmInstr::from("popq", "%rbx"),  */
+                        AsmInstr::from("popq", "%rax"),
+                        AsmInstr::new("cdq".to_string(), String::new()),
+                        AsmInstr::from("popq", "%rbp"),
+                        AsmInstr::from("ret", ""),
+                    ],
                 );
                 constructed_assembly
             }
@@ -91,7 +97,11 @@ impl AsmGenerator {
                     asm
                 }
             }
-            ast::Statement::Expression(expression) => self.gen_expression(expression),
+            ast::Statement::Expression(expression) => {
+                let mut asm = self.gen_expression(expression);
+                asm.add_instructions(Asm::instruction("popq".into(), "%rbx".into()));
+                asm
+            }
         }
     }
 
