@@ -1,4 +1,7 @@
-use crate::token::{Token, IDENTIFIER_REGEX, INTEGER_LITERAL_REGEX};
+use crate::{
+    parser::fail,
+    token::{Token, IDENTIFIER_REGEX, INTEGER_LITERAL_REGEX},
+};
 use std::mem;
 
 // The struct simply transforms an input file into a token stream
@@ -8,6 +11,7 @@ pub struct Lexer {
     input: String,
     curr_substr: String,
     curr_token: Option<Token>,
+    prev_token: Option<Token>,
 }
 
 impl Lexer {
@@ -17,6 +21,7 @@ impl Lexer {
             input,
             curr_substr: String::new(),
             curr_token: None,
+            prev_token: None,
         };
         lexer.curr_token = lexer.next_token();
         lexer
@@ -28,6 +33,8 @@ impl Lexer {
         match curr_substr {
             "int" => Some(Token::KeywordInt),
             "return" => Some(Token::KeywordReturn),
+            "else" => Some(Token::KeywordElse),
+            "if" => Some(Token::KeywordIf),
             _ if INTEGER_LITERAL_REGEX.is_match(curr_substr) => {
                 Some(Token::IntegerLiteral(curr_substr.to_string()))
             }
@@ -62,6 +69,33 @@ impl Lexer {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
                     Some(Token::MinusAssign)
+                } else if next_char == Some(&('-' as u8)) {
+                    self.pos += 1;
+                    match self.prev_token {
+                        Some(Token::Identifier(ref name)) => {
+                            Some(Token::PostfixDecrement(name.clone()))
+                        }
+                        _ => {
+                            let cached_pos = self.pos;
+                            let cached_prev_token = self.prev_token.take();
+                            let cached_curr_token = self.curr_token.take();
+                            let cached_substr = std::mem::take(&mut self.curr_substr);
+                            let next_token = self.next_token();
+                            self.pos = cached_pos;
+                            self.prev_token = cached_prev_token;
+                            self.curr_token = cached_curr_token;
+                            self.curr_substr = cached_substr;
+                            match next_token {
+                                Some(Token::Identifier(name)) => Some(Token::PrefixDecrement(name)),
+                                Some(Token::IntegerLiteral(int)) => {
+                                    fail(format!("Cannot increment a temporary value {int}"))
+                                }
+                                _ => {
+                                    unreachable!("Cannot increment something other than a variable")
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Some(Token::Minus)
                 }
@@ -78,6 +112,33 @@ impl Lexer {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
                     Some(Token::AddAssign)
+                } else if next_char == Some(&('+' as u8)) {
+                    self.pos += 1;
+                    match self.prev_token {
+                        Some(Token::Identifier(ref name)) => {
+                            Some(Token::PostfixIncrement(name.clone()))
+                        }
+                        _ => {
+                            let cached_pos = self.pos;
+                            let cached_prev_token = self.prev_token.take();
+                            let cached_curr_token = self.curr_token.take();
+                            let cached_substr = std::mem::take(&mut self.curr_substr);
+                            let next_token = self.next_token();
+                            self.pos = cached_pos;
+                            self.prev_token = cached_prev_token;
+                            self.curr_token = cached_curr_token;
+                            self.curr_substr = cached_substr;
+                            match next_token {
+                                Some(Token::Identifier(name)) => Some(Token::PrefixDecrement(name)),
+                                Some(Token::IntegerLiteral(int)) => {
+                                    fail(format!("Cannot increment a temporary value {int}"))
+                                }
+                                _ => {
+                                    unreachable!("Cannot increment something other than a variable")
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Some(Token::Add)
                 }
@@ -252,6 +313,7 @@ impl Iterator for Lexer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.prev_token = self.curr_token.clone();
         let temp = self.curr_token.take();
         self.curr_token = self.next_token();
         temp

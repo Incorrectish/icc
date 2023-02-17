@@ -71,6 +71,12 @@ impl Parser {
         ast::FuncDecl::Func(indentifier, statements)
     }
 
+    // This returns a collection of statements. It returns none if the the token is a curly brace
+    // eg for something like
+    //  int a = 5;
+    //  int b = 7;
+    // }
+    // it will return Some(vec[declare(a, 5)]), Some(vec[declare(a, 5)]), None
     fn parse_statement(&mut self) -> Option<Vec<ast::Statement>> {
         // let token = self.lexer.next().expect("Invalid token sequence");
         let token = self.lexer.peek().expect("Invalid token sequence");
@@ -80,6 +86,7 @@ impl Parser {
 
         match token {
             Token::KeywordReturn => Some(vec![self.parse_return_statement()]),
+            Token::KeywordIf => Some(vec![self.parse_if_statement()]),
             Token::KeywordInt => {
                 let _ = self.lexer.next();
                 Some(self.parse_assignment_statement())
@@ -87,6 +94,92 @@ impl Parser {
             Token::Identifier(_) => Some(vec![self.parse_expression_statement()]),
             Token::IntegerLiteral(_) => Some(vec![self.parse_expression_statement()]),
             _ => panic!("Is this the token: {token:?}?"),
+        }
+    }
+
+    fn parse_if_statement(&mut self) -> ast::Statement {
+        let Token::KeywordIf = self.lexer.next().expect("Should be if") else {
+        unreachable!()
+    };
+        let Token::OpenParen = self.lexer.next().expect("Needs opening parentheses around if condition") else {
+        fail(format!("Needed opening parens around if"));
+    };
+        let expression = self.parse_expression();
+        let Token::CloseParen = self.lexer.next().expect("Needs closing parentheses around if condition") else {
+        fail(format!("Needed closing parens around if"));
+    };
+        // TODO:
+        let potential_open_brace = self.lexer.peek().expect("Needs statement after if");
+        if let Token::OpenBrace = potential_open_brace {
+            let _ = self.lexer.next();
+            let mut if_children_statements = vec![];
+            while let Some(mut statements) = self.parse_statement() {
+                if_children_statements.append(&mut statements);
+            }
+            let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+            let else_token = self.lexer.peek().expect("This is invalid, there should be a curly brace, signifying a block ending or a statement after the end of an if statement");
+            if !matches!(else_token, Token::KeywordElse) {
+                return ast::Statement::Conditional(expression, if_children_statements, None);
+            }
+
+            let _ = self.lexer.next();
+
+            let potential_else_open_brace =
+                self.lexer.peek().expect("Else cannot be the last token :(");
+            if let Token::OpenBrace = potential_else_open_brace {
+                let mut else_children_statements = vec![];
+                while let Some(mut statements) = self.parse_statement() {
+                    else_children_statements.append(&mut statements);
+                }
+                let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+                return ast::Statement::Conditional(
+                    expression,
+                    if_children_statements,
+                    Some(else_children_statements),
+                );
+            }
+
+            let else_children_statement = self
+                .parse_statement()
+                .expect("Expected statement after else");
+            ast::Statement::Conditional(
+                expression,
+                if_children_statements,
+                Some(else_children_statement),
+            )
+        } else {
+            let if_children_statement = self
+                .parse_statement()
+                .expect("Expected expression after if");
+            let else_token = self.lexer.peek().expect("This is invalid, there should be a curly brace or statement after the end of an if statement");
+            if !matches!(else_token, Token::KeywordElse) {
+                let _ = self.lexer.next();
+                let potential_else_open_brace =
+                    self.lexer.peek().expect("Else cannot be the last token :(");
+                if let Token::OpenBrace = potential_else_open_brace {
+                    let mut else_children_statements = vec![];
+                    while let Some(mut statements) = self.parse_statement() {
+                        else_children_statements.append(&mut statements);
+                    }
+                    let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+                    return ast::Statement::Conditional(
+                        expression,
+                        if_children_statement,
+                        Some(else_children_statements),
+                    );
+                } else {
+                    let else_children_statement = self
+                        .parse_statement()
+                        .expect("Expected statement after else");
+                    ast::Statement::Conditional(
+                        expression,
+                        if_children_statement,
+                        Some(else_children_statement),
+                    )
+                }
+            } else {
+                ast::Statement::Conditional(expression, if_children_statement, None)
+            }
         }
     }
 
@@ -159,6 +252,19 @@ impl Parser {
             fail(format!("Expected variable name, got {token:?}"));
         }
     }
+
+    // fn parse_expression(&mut self) -> ast::Expression {
+    //     let mut term = self.parse_ternary();
+    //     loop {
+    //         let operation = self.lexer.peek();
+    //         if !matches!(operation, Some(Token::LogicalOr)) {
+    //             return term;
+    //         }
+    //         let operation = Self::parse_to_op(self.lexer.next().unwrap());
+    //         let next_term = self.parse_ternary();
+    //         term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+    //     }
+    // }
 
     // TODO: Error messages, error messages
     fn parse_expression(&mut self) -> ast::Expression {
@@ -319,42 +425,90 @@ impl Parser {
     fn parse_factor(&mut self) -> ast::Expression {
         let token = self.lexer.next();
         match token {
-            Some(Token::IntegerLiteral(int_literal)) => {
-                ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+        Some(Token::IntegerLiteral(int_literal)) => {
+            ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+        }
+        Some(Token::BitwiseComplement) => {
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression())),
+                _ => fail(format!("Unary operator must be succeeded by an expression, found {next_token:?} instead")),
             }
-            Some(Token::BitwiseComplement) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression()))
-            },
-            Some(Token::LogicalNot) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression()))
-            },
-            Some(Token::Minus) => {
-                ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression()))
-            },
-            Some(Token::OpenParen) => {
-                let expression = self.parse_expression();
-                let next_token = self.lexer.next();
-                if !matches!(next_token, Some(Token::CloseParen)) {
-                    fail(format!("Token must be an closing parentheses, instead got {next_token:?}"));
-                }
-                expression
-            },
-            Some(Token::Identifier(name)) => {
-                let next_token = self.lexer.peek();
-                if matches!(next_token, Some(Token::Assign)) {
+        },
+        Some(Token::LogicalNot) => {
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression())),
+                _ => fail(format!("Unary operator must be succeeded by an expression, found {next_token:?} instead")),
+            }
+        },
+        Some(Token::Minus) => {
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression())),
+                _ => fail(format!("Unary operator must be succeeded by an expression, found {next_token:?} instead")),
+            }
+        },
+        Some(Token::PrefixDecrement(name)) => {
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(self.parse_expression())),
+                _ => fail(format!("Unary operator must be succeeded by an expression, found {next_token:?} instead")),
+            }
+        },
+        Some(Token::PrefixIncrement(name)) => {
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(self.parse_expression())),
+                _ => fail(format!("Unary operator must be succeeded by an expression, found {next_token:?} instead")),
+            }
+        },
+        Some(Token::OpenParen) => {
+            let expression = self.parse_expression();
+            let next_token = self.lexer.next();
+            if !matches!(next_token, Some(Token::CloseParen)) {
+                fail(format!("Token must be an closing parentheses, instead got {next_token:?}"));
+            }
+            expression
+        },
+        Some(Token::Identifier(name)) => {
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Assign) => {
                     let _ = self.lexer.next();
                     ast::Expression::Assign(name, Box::new(self.parse_expression()))
-                } else if matches!(next_token, Some(Token::AddAssign) | Some(Token::MulAssign) | Some(Token::ModAssign) | Some(Token::MinusAssign) | Some(Token::BitwiseAndAssign) | Some(Token::BitwiseOrAssign) | Some(Token::BitwiseLeftShiftAssign) | Some(Token::BitwiseRightShift) | Some(Token::XorAssign) ) {
+                }
+                Some(Token::AddAssign) | Some(Token::MulAssign) | Some(Token::ModAssign) | Some(Token::MinusAssign) | Some(Token::BitwiseAndAssign) | Some(Token::BitwiseOrAssign) | Some(Token::BitwiseLeftShiftAssign) | Some(Token::BitwiseRightShift) | Some(Token::XorAssign) => {
                     let _ = self.lexer.next();
                     let binary_operator = match next_token { Some(Token::AddAssign) => BinaryOperator::Add  ,| Some(Token::MulAssign) => BinaryOperator::Multiply  ,| Some(Token::ModAssign) => BinaryOperator::Modulo  ,| Some(Token::MinusAssign) => BinaryOperator::Minus  ,| Some(Token::BitwiseAndAssign) => BinaryOperator::BitwiseAnd  ,| Some(Token::BitwiseOrAssign) => BinaryOperator::BitwiseOr  ,| Some(Token::BitwiseLeftShiftAssign) => BinaryOperator::BitwiseLeftShift  ,| Some(Token::BitwiseRightShiftAssign) => BinaryOperator::BitwiseRightShift  ,| Some(Token::XorAssign) => BinaryOperator::Xor, _ => unreachable!(), };
                     ast::Expression::Assign(name.clone(), Box::new(ast::Expression::BinaryOp(binary_operator, Box::new(ast::Expression::ReferenceVariable(name)), Box::new(self.parse_expression()))))
-                } else {
+                }
+                Some(Token::PostfixIncrement(other_name)) => {
+                    let _ = self.lexer.next();
+                    ast::Expression::UnaryOp(ast::UnaryOperator::PostfixIncrement(other_name), Box::new(ast::Expression::ReferenceVariable(name)))
+                }
+                Some(Token::PostfixDecrement(other_name)) => {
+                    let _ = self.lexer.next();
+                    ast::Expression::UnaryOp(ast::UnaryOperator::PostfixDecrement(other_name), Box::new(ast::Expression::ReferenceVariable(name)))
+                }
+                _ => {
                     // fail(format!("Token must be assignment[=], instead got {next_token:?}"));
                     ast::Expression::ReferenceVariable(name)
                 }
             }
-            _ => fail(format!("Token must be an expression, instead got {token:?}")),
         }
+        _ => fail(format!("Token must be an expression, instead got {token:?}")),
+    }
     }
 
     fn parse_to_op(operation: Token) -> ast::BinaryOperator {

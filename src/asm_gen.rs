@@ -63,7 +63,6 @@ impl AsmGenerator {
 
     fn gen_statement(&mut self, statement: ast::Statement) -> Asm {
         match statement {
-            // parses the statements
             ast::Statement::Return(expression) => {
                 let constructed_assembly = Asm::new(
                     self.gen_expression(expression),
@@ -102,6 +101,7 @@ impl AsmGenerator {
                 asm.add_instructions(Asm::instruction("popq".into(), "%rbx".into()));
                 asm
             }
+            ast::Statement::Conditional(_, _, _) => todo!(),
         }
     }
 
@@ -110,11 +110,13 @@ impl AsmGenerator {
             ast::Expression::Constant(int) => {
                 Asm::instruction("pushq".to_string(), format!("${int}"))
             }
-            ast::Expression::UnaryOp(operator, expression) => {
-                let mut asm = self.gen_expression(*expression);
-                asm.add_instructions(Self::operation(operator));
-                asm
-            }
+            ast::Expression::UnaryOp(operator, expression) => match operator {
+                _ => {
+                    let mut asm = self.gen_expression(*expression);
+                    asm.add_instructions(Self::operation(operator));
+                    asm
+                }
+            },
             ast::Expression::BinaryOp(binary_operator, left_expr, right_expr) => {
                 self.gen_binary_operation_expression(binary_operator, left_expr, right_expr)
             }
@@ -178,6 +180,7 @@ impl AsmGenerator {
             left_exp.append_instruction(binop, "%rbx,%rax".into());
             left_exp.append_instruction("pushq".into(), "%rax".into());
         } else if matches!(binary_operator, BinaryOperator::Modulo) {
+            todo!("This does not work yet!! Gives junk such as 1 % 5 = 4!");
             left_exp.append_instruction("popq".into(), "%rbx".into());
             left_exp.append_instruction("popq".into(), "%rax".into());
             left_exp.append_instruction("cqo".into(), String::new());
@@ -276,6 +279,11 @@ impl AsmGenerator {
                 AsmInstr::from("sete", "%rcx"),
                 AsmInstr::from("movq", "%rcx,(%rsp)"),
             ]),
+            ast::UnaryOperator::PostfixIncrement(name) => Asm::instructions(vec![]),
+            ast::UnaryOperator::PrefixIncrement(name) => Asm::instructions(vec![todo!()]),
+            ast::UnaryOperator::PrefixDecrement(name) => Asm::instructions(vec![todo!()]),
+            ast::UnaryOperator::PostfixDecrement(name) => Asm::instructions(vec![todo!()]),
+            _ => unreachable!(),
             // format!("cmpl $0, {location}\nsete {location}"),
         }
     }
@@ -286,11 +294,11 @@ impl AsmGenerator {
             ast::BinaryOperator::Minus => "subq".to_string(),
             ast::BinaryOperator::Multiply => "imulq".to_string(),
             ast::BinaryOperator::Divide => "idivq".to_string(),
+            // TODO MODULO DOES NOT WORK
             ast::BinaryOperator::Modulo => "idivq".to_string(),
             ast::BinaryOperator::Xor => "xorq".to_string(),
             ast::BinaryOperator::BitwiseAnd => "andq".to_string(),
             ast::BinaryOperator::BitwiseOr => "orq".to_string(),
-            // TODO: fix these
             ast::BinaryOperator::BitwiseRightShift => "sarq".to_string(),
             ast::BinaryOperator::BitwiseLeftShift => "salq".to_string(),
             ast::BinaryOperator::GreaterEq => "setge".to_string(),
@@ -299,7 +307,6 @@ impl AsmGenerator {
             ast::BinaryOperator::Less => "setl".to_string(),
             ast::BinaryOperator::NotEqual => "setne".to_string(),
             ast::BinaryOperator::Equal => "sete".to_string(),
-
             ast::BinaryOperator::LogicalAnd => {
                 unreachable!("You should not use this function on a logical and input")
             }
