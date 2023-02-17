@@ -48,7 +48,7 @@ pub enum Expression {
     BinaryOp(BinaryOperator, Box<Expression>, Box<Expression>),
     Assign(String, Box<Expression>),
     ReferenceVariable(String),
-    // Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
+    Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug)]
@@ -95,7 +95,7 @@ impl FuncDecl {
 }
 
 impl Statement {
-    fn print(&self, depth: usize) {
+    pub fn print(&self, depth: usize) {
         let indentation = INDENT.repeat(depth);
         match self {
             Statement::Return(ref exp) => {
@@ -136,7 +136,7 @@ impl Statement {
 }
 
 impl Expression {
-    fn print(&self) {
+    pub fn print(&self) {
         match self {
             Expression::Constant(int) => print!("int<{int}>"),
             Expression::UnaryOp(operator, expression) => {
@@ -170,6 +170,15 @@ impl Expression {
                 print!(")");
             }
             Expression::ReferenceVariable(name) => print!("var<{name}>"),
+            Expression::Ternary(exp1, exp2, exp3) => {
+                print!("[");
+                exp1.print();
+                print!("? ");
+                exp2.print();
+                print!(" : ");
+                exp3.print();
+                print!("]");
+            }
         }
     }
 }

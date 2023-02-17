@@ -1,1 +1,2 @@
-ternary ::= {<logical or expression>} "?" {<logical or expression>} ":" {<logical or expression>} 
+ternary ::= <ternary> | <binary-exp> "?" <ternary> | <binary-exp> : <ternary> |
+<binary-exp>

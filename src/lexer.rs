@@ -307,6 +307,10 @@ impl Lexer {
             self.pos += 1;
         }
     }
+
+    pub fn get_rest_of_input(&self) -> String {
+        self.input.split_at(self.pos).1.into()
+    }
 }
 
 impl Iterator for Lexer {

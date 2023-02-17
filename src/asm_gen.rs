@@ -146,6 +146,7 @@ impl AsmGenerator {
                     fail(format!("Variable \"{name}\" referenced but not declared"));
                 }
             }
+            ast::Expression::Ternary(_, _, _) => todo!(),
         }
     }
 
