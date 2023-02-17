@@ -261,118 +261,128 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self) -> ast::Expression {
-        let term_one = self.parse_ternary();
-        let operation = self.lexer.peek();
-        if !matches!(operation, Some(Token::Question)) {
-            return term_one;
-        }
-        let _ = self.lexer.next();
-        let mut term_two = self.parse_ternary();
-        let operation = self.lexer.peek();
-        if matches!(operation, Some(Token::Question)) {
-            let _ = self.lexer.next();
-            term_two = self.parse_partial_ternary(term_two);
-            let operation_two = self.lexer.peek();
-            // potential while loop
-        } else if matches!(operation, Some(Token::Colon)) {
-            // TODO: 
-            let _ = self.lexer.next();
-            let term_three = self.parse_ternary();
-            ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
-        } else {
-            term_one.print();
-            println!();
-            term_two.print();
-            println!();
-            fail(format!(
-            "Ternary must seperate conditional expressions with \":\". Instead got {operation:?}"
-        ));
-        }
-    }
-
-    fn parse_partial_ternary(&mut self, term_one: ast::Expression) -> ast::Expression {
-        let term_two = self.parse_expression();
-        let operation = self.lexer.peek();
-        if !matches!(operation, Some(Token::Colon)) {
-            fail(format!("Ternary must seperate conditional expressions with \":\". Instead got {operation:?}"));
-        }
-        let _ = self.lexer.next();
-        let term_three = self.parse_expression();
-        ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
-    }
+    // fn parse_expression(&mut self) -> ast::Expression {
+    //     let term_one = self.parse_ternary();
+    //     let operation = self.lexer.peek();
+    //     if !matches!(operation, Some(Token::Question)) {
+    //         return term_one;
+    //     }
+    //     let _ = self.lexer.next();
+    //     let mut term_two = self.parse_ternary();
+    //     let operation = self.lexer.peek();
+    //     if matches!(operation, Some(Token::Question)) {
+    //         let _ = self.lexer.next();
+    //         term_two = self.parse_partial_ternary(term_two);
+    //         let operation_two = self.lexer.peek();
+    //         // potential while loop
+    //     } else if matches!(operation, Some(Token::Colon)) {
+    //         // TODO: 
+    //         let _ = self.lexer.next();
+    //         let term_three = self.parse_ternary();
+    //         ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
+    //     } else {
+    //         term_one.print();
+    //         println!();
+    //         term_two.print();
+    //         println!();
+    //         fail(format!(
+    //         "Ternary must seperate conditional expressions with \":\". Instead got {operation:?}"
+    //     ));
+    //     }
+    // }
+    //
+    // fn parse_partial_ternary(&mut self, term_one: ast::Expression) -> ast::Expression {
+    //     let term_two = self.parse_expression();
+    //     let operation = self.lexer.peek();
+    //     if !matches!(operation, Some(Token::Colon)) {
+    //         fail(format!("Ternary must seperate conditional expressions with \":\". Instead got {operation:?}"));
+    //     }
+    //     let _ = self.lexer.next();
+    //     let term_three = self.parse_expression();
+    //     ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
+    // }
 
     // TODO: Error messages, error messages
-    fn parse_ternary(&mut self) -> ast::Expression {
-        let mut term = self.parse_logical_or();
+    fn parse_expression(&mut self) -> ast::Expression {
+        // TODO:
+        self.parse_conditional_expr()
+    }
+
+    fn parse_conditional_expr(&mut self) -> ast::Expression {
+        let term_one = self.parse_logical_or_expr();
+        let token = self.lexer.peek();
+        if matches!(token, Some(Token::Question)) {
+            let _ = self.lexer.next();
+            let term_two = self.parse_expression();
+            let token = self.lexer.peek();
+            if !matches!(token, Some(Token::Colon)) {
+                fail(format!("Expected \":\" after ternary expression, found {token:?}"));
+            }
+            let _ = self.lexer.next();
+            let term_three = self.parse_conditional_expr();
+            ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
+        } else {
+            term_one
+        }
+    }
+
+    fn parse_logical_or_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_logical_and_expr();
         loop {
             let operation = self.lexer.peek();
             if !matches!(operation, Some(Token::LogicalOr)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_logical_or();
+            let next_term = self.parse_logical_and_expr();
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
-    fn parse_logical_or(&mut self) -> ast::Expression {
-        let mut term = self.parse_logical_and();
+    fn parse_logical_and_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_or_expr();
         loop {
             let operation = self.lexer.peek();
             if !matches!(operation, Some(Token::LogicalAnd)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_logical_and();
+            let next_term = self.parse_bit_or_expr();
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
-    fn parse_logical_and(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_or();
+    fn parse_bit_or_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_xor_expr();
         loop {
             let operation = self.lexer.peek();
             if !matches!(operation, Some(Token::BitwiseOr)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_or();
+            let next_term = self.parse_bit_xor_expr();
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
-    fn parse_bit_or(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_xor();
+    fn parse_bit_xor_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_and_expr();
         loop {
             let operation = self.lexer.peek();
             if !matches!(operation, Some(Token::Xor)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_xor();
+            let next_term = self.parse_bit_and_expr();
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
-    fn parse_bit_xor(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_and();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::BitwiseAnd)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_and();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
-        }
-    }
-
-    fn parse_bit_and(&mut self) -> ast::Expression {
+    fn parse_bit_and_expr(&mut self) -> ast::Expression {
         let mut term = self.parse_equality_expr();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::Equal) | Some(Token::NotEqual)) {
+            if !matches!(operation, Some(Token::BitwiseAnd)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -385,6 +395,19 @@ impl Parser {
         let mut term = self.parse_relational_expr();
         loop {
             let operation = self.lexer.peek();
+            if !matches!(operation, Some(Token::Equal) | Some(Token::NotEqual)) {
+                return term;
+            }
+            let operation = Self::parse_to_op(self.lexer.next().unwrap());
+            let next_term = self.parse_relational_expr();
+            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+        }
+    }
+
+    fn parse_relational_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_bit_shift_expr();
+        loop {
+            let operation = self.lexer.peek();
             if !matches!(
                 operation,
                 Some(Token::LessEq)
@@ -395,13 +418,13 @@ impl Parser {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_relational_expr();
+            let next_term = self.parse_bit_shift_expr();
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
-    fn parse_relational_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_shift();
+    fn parse_bit_shift_expr(&mut self) -> ast::Expression {
+        let mut term = self.parse_additive_expr();
         loop {
             let operation = self.lexer.peek();
             if !matches!(
@@ -411,25 +434,12 @@ impl Parser {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_shift();
+            let next_term = self.parse_additive_expr();
             term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
         }
     }
 
-    fn parse_bit_shift(&mut self) -> ast::Expression {
-        let mut term = self.parse_add_sub();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::LogicalAnd)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_add_sub();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
-        }
-    }
-
-    fn parse_add_sub(&mut self) -> ast::Expression {
+    fn parse_additive_expr(&mut self) -> ast::Expression {
         let mut term = self.parse_term();
         loop {
             let operation = self.lexer.peek();
