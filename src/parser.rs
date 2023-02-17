@@ -174,6 +174,7 @@ impl Parser {
         let potential_else_open_brace =
             self.lexer.peek().expect("Else cannot be the last token :(");
         if let Token::OpenBrace = potential_else_open_brace {
+            let _ = self.lexer.next();
             let mut else_children_statements = vec![];
             while let Some(mut statements) = self.parse_statement() {
                 else_children_statements.append(&mut statements);

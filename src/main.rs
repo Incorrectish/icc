@@ -13,9 +13,9 @@ fn main() {
     // Command args contain the binary directory relative path as the first argument, so the second
     // argument will be the filename given to the compiler
     let filename = env::args().nth(1).expect("Please provide a file to lex");
-    test_lexer(Path::new(&filename));
-    test_ast(Path::new(&filename));
-    // compile(Path::new(&filename));
+    // test_lexer(Path::new(&filename));
+    // test_ast(Path::new(&filename));
+    compile(Path::new(&filename));
     // test_output(Path::new(&filename));
 }
 

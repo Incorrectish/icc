@@ -1,3 +1,7 @@
 int main() {
-    int c = 7 > 6? 8 > 7? 9 : 6 : 8 == 8? 4 : 2;
+    int a = 7;
+    if (0) {
+        a = 8;
+    } 
+    return a;
 }

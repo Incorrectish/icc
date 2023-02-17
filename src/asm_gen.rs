@@ -101,7 +101,48 @@ impl AsmGenerator {
                 asm.add_instructions(Asm::instruction("popq".into(), "%rbx".into()));
                 asm
             }
-            ast::Statement::Conditional(_, _, _) => todo!(),
+            ast::Statement::Conditional(expression, if_children, potential_else_children) => {
+                let mut asm = self.gen_expression(expression);
+                let else_ = self.gen_new_label("else");
+                let else_label = format!("{else_}:");
+                asm.add_instructions(Asm::instructions(vec![
+                    AsmInstr::from("popq", "%rax"),
+                    AsmInstr::from("cmpq", "$0,%rax"),
+                    AsmInstr::new("je".into(), else_.clone()),
+                ]));
+                for statement in if_children {
+                    asm.add_instructions(self.gen_statement(statement));
+                }
+                if let Some(else_children) = potential_else_children {
+                    // TODO: get labels, else, and endofif
+                    let endif_ = self.gen_new_label("endif");
+                    let endif_label = format!("{endif_}:");
+                    asm.add_instructions(Asm::instructions(vec![
+                        AsmInstr::new("jmp".into(), endif_),
+                        AsmInstr::new(else_label, String::new()),
+                    ]));
+                    for statement in else_children {
+                        asm.add_instructions(self.gen_statement(statement));
+                    }
+                    asm.add_instructions(Asm::instruction(endif_label, String::new()))
+                } else {
+                    asm.add_instructions(Asm::instruction(else_label, String::new()))
+                }
+                asm
+                // For if statements, it should be as easy as generating
+                // if exp {statement} [else {statement}]
+                // gen(exp)
+                // value is at the top of the stack
+                // je else
+                // for(statements) : gen(statement)
+                // jmp end of else
+                // if else.is_some()
+                //  else:
+                //  for (statements ) : gen(statement)
+                // end_of_if:
+                // if else.is_none
+                // end_of_if
+            }
         }
     }
 
