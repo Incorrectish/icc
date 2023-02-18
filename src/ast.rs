@@ -57,7 +57,10 @@ pub enum Statement {
     Declare(String, Option<Expression>),
     Expression(Expression),
     Conditional(Expression, Vec<Statement>, Option<Vec<Statement>>),
+    Block(Vec<Statement>),
 }
+
+// TODO: make declerations as the only part of an if statement without an associated block invalid
 
 #[derive(Debug)]
 pub enum FuncDecl {
@@ -130,6 +133,13 @@ impl Statement {
                         child.print(depth + 1);
                     }
                 }
+            }
+            Self::Block(statements) => {
+                println!("{indentation}begin");
+                for statement in statements {
+                    statement.print(depth + 1);
+                }
+                println!("{indentation}end");
             }
         }
     }

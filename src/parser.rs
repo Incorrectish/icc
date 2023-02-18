@@ -95,9 +95,23 @@ impl Parser {
             | Token::IntegerLiteral(_)
             | Token::PrefixDecrement(_)
             | Token::PrefixIncrement(_) => Some(vec![self.parse_expression_statement()]),
+            Token::OpenBrace => {let _ = self.lexer.next(); Some(vec![self.parse_block()])},
             _ => panic!("Is this the token: {token:?}?"),
         }
     }
+
+fn parse_block(&mut self) -> ast::Statement {
+    ast::Statement::Block(self.parse_block_of_statements())
+}
+
+fn parse_block_of_statements(&mut self) -> Vec<ast::Statement> {
+    let mut block_statements = vec![];
+    while let Some(mut statements) = self.parse_statement() {
+        block_statements.append(&mut statements);
+    }
+    let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+    block_statements
+}
 
     fn parse_if_statement(&mut self) -> ast::Statement {
         let Token::KeywordIf = self.lexer.next().expect("Should be if") else {
@@ -129,11 +143,7 @@ impl Parser {
                 self.lexer.peek().expect("Else cannot be the last token :(");
             if let Token::OpenBrace = potential_else_open_brace {
                 let _ = self.lexer.next();
-                let mut else_children_statements = vec![];
-                while let Some(mut statements) = self.parse_statement() {
-                    else_children_statements.append(&mut statements);
-                }
-                let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+                let else_children_statements = self.parse_block_of_statements();
                 return ast::Statement::Conditional(
                     expression,
                     if_children_statement,
@@ -156,11 +166,7 @@ impl Parser {
 
     fn parse_if_curly_statement(&mut self, expression: Expression) -> ast::Statement {
         let _ = self.lexer.next();
-        let mut if_children_statements = vec![];
-        while let Some(mut statements) = self.parse_statement() {
-            if_children_statements.append(&mut statements);
-        }
-        let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+        let if_children_statements = self.parse_block_of_statements();
         let conditional_else_token = self.lexer.peek();
         let Some(else_token) = conditional_else_token else {
                 fail(format!("Wtf is this token: {conditional_else_token:?}, and this lexer: {:?}", self.lexer.get_rest_of_input()))
@@ -175,11 +181,7 @@ impl Parser {
             self.lexer.peek().expect("Else cannot be the last token :(");
         if let Token::OpenBrace = potential_else_open_brace {
             let _ = self.lexer.next();
-            let mut else_children_statements = vec![];
-            while let Some(mut statements) = self.parse_statement() {
-                else_children_statements.append(&mut statements);
-            }
-            let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+            let else_children_statements = self.parse_block_of_statements();
             return ast::Statement::Conditional(
                 expression,
                 if_children_statements,
@@ -241,9 +243,6 @@ impl Parser {
                     statements.append(&mut self.parse_assignment_statement());
                     statements
                 } else {
-                    // print!("ast Node: ");
-                    // statement.print(0);
-                    // println!();
                     fail(format!(
                         "(within assignment) Needs semicolon, got {token:?} ast Node until now = {statement:?}"
                     ));

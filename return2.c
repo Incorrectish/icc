@@ -1,7 +1,8 @@
 int main() {
     int a = 7;
-    if (0) {
-        a = 8;
-    } 
+    {
+        a += 7;
+        int b = 8;
+    }
     return a;
 }

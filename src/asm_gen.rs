@@ -103,7 +103,7 @@ impl AsmGenerator {
             }
             ast::Statement::Conditional(expression, if_children, potential_else_children) => {
                 let mut asm = self.gen_expression(expression);
-                let else_ = self.gen_new_label("else");
+                let else_ = self.gen_new_label();
                 let else_label = format!("{else_}:");
                 asm.add_instructions(Asm::instructions(vec![
                     AsmInstr::from("popq", "%rax"),
@@ -115,7 +115,7 @@ impl AsmGenerator {
                 }
                 if let Some(else_children) = potential_else_children {
                     // TODO: get labels, else, and endofif
-                    let endif_ = self.gen_new_label("endif");
+                    let endif_ = self.gen_new_label();
                     let endif_label = format!("{endif_}:");
                     asm.add_instructions(Asm::instructions(vec![
                         AsmInstr::new("jmp".into(), endif_),
@@ -143,6 +143,7 @@ impl AsmGenerator {
                 // if else.is_none
                 // end_of_if
             }
+            ast::Statement::Block(_) => todo!(),
         }
     }
 
@@ -187,7 +188,12 @@ impl AsmGenerator {
                     fail(format!("Variable \"{name}\" referenced but not declared"));
                 }
             }
-            ast::Expression::Ternary(_, _, _) => todo!(),
+            ast::Expression::Ternary(expression1, expression2, expression3) => {
+                let else_name = self.gen_new_label();
+                let else_label = format!("{else_name}:");
+                let endternary_name = self.gen_new_label();
+                let endternary_label = format!("{endternary_name}:");
+            },
         }
     }
 
@@ -252,11 +258,11 @@ impl AsmGenerator {
         } else if matches!(binary_operator, BinaryOperator::LogicalOr) {
             left_exp.append_instruction("popq".into(), "%rbx".into());
             left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
-            let label1_name = self.gen_new_label("logicaljump");
+            let label1_name = self.gen_new_label();
             let label1 = format!("{label1_name}:");
-            let label2_name = self.gen_new_label("logicaljump");
+            let label2_name = self.gen_new_label();
             let label2 = format!("{label2_name}:");
-            let label3_name = self.gen_new_label("logicaljump");
+            let label3_name = self.gen_new_label();
             let label3 = format!("{label3_name}:");
             left_exp.append_instruction("jne".into(), label1_name);
             left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
@@ -270,9 +276,9 @@ impl AsmGenerator {
         } else if matches!(binary_operator, BinaryOperator::LogicalAnd) {
             left_exp.append_instruction("popq".into(), "%rbx".into());
             left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
-            let label1_name = self.gen_new_label("logicaljump");
+            let label1_name = self.gen_new_label();
             let label1 = format!("{label1_name}:");
-            let label2_name = self.gen_new_label("logicaljump");
+            let label2_name = self.gen_new_label();
             let label2 = format!("{label2_name}:");
             left_exp.append_instruction("je".into(), label1_name.clone());
             left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
@@ -358,8 +364,8 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_new_label(&mut self, label_identifier: &str) -> String {
-        let label = format!(".{label_identifier}{}", self.jump_counter);
+    fn gen_new_label(&mut self) -> String {
+        let label = format!(".L{}", self.jump_counter);
         self.jump_counter += 1;
         label
     }
