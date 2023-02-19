@@ -129,7 +129,7 @@ impl Lexer {
                             self.curr_token = cached_curr_token;
                             self.curr_substr = cached_substr;
                             match next_token {
-                                Some(Token::Identifier(name)) => Some(Token::PrefixDecrement(name)),
+                                Some(Token::Identifier(name)) => Some(Token::PrefixIncrement(name)),
                                 Some(Token::IntegerLiteral(int)) => {
                                     fail(format!("Cannot increment a temporary value {int}"))
                                 }

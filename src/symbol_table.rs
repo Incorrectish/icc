@@ -23,7 +23,7 @@ impl SymbolTable {
         self.0.remove(name);
     }
 
-    pub fn get(&mut self, name: &str) -> Option<&String> {
+    pub fn get(&self, name: &str) -> Option<&String> {
         let optional_location = self.0.get(name);
         if let Some(location) = optional_location {
             Some(location)
