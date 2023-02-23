@@ -3,8 +3,8 @@ pub const INDENT: &str = "    ";
 
 // These are all the enums necessary for the abstract syntax tree
 // The grammer is as follows:
-// Program ::= Function Decleration
-// Function Decleration ::= (name, Statement)
+// Program ::= Function Declaration
+// Function Declaration ::= (name, Statement)
 // Statement ::= return(Expression)
 // Expression ::= unaryop(operator, expression) | value
 
@@ -54,17 +54,26 @@ pub enum Expression {
 #[derive(Debug)]
 pub enum Statement {
     Return(Expression),
-    Declare(String, Option<Expression>),
     Expression(Expression),
-    Conditional(Expression, Vec<Statement>, Option<Vec<Statement>>),
-    Block(Vec<Statement>),
+    Conditional(Expression, Box<Statement>, Box<Option<Statement>>),
+    Block(Vec<BlockItem>),
 }
 
-// TODO: make declerations as the only part of an if statement without an associated block invalid
+#[derive(Debug)]
+pub enum Declaration {
+    Declare(String, Option<Expression>, Box<Option<Declaration>>),
+}
+
+#[derive(Debug)]
+pub enum BlockItem {
+    Statement(Statement),
+    Declaration(Declaration),
+}
+// TODO: make declarations as the only part of an if statement without an associated block invalid
 
 #[derive(Debug)]
 pub enum FuncDecl {
-    Func(String, Vec<Statement>),
+    Func(String, Vec<BlockItem>),
 }
 
 #[derive(Debug)]
@@ -76,21 +85,56 @@ impl Prog {
     pub fn print(&self) {
         match self {
             Prog::Prog(ref func) => {
-                println!("Program: ");
-                func.print(1);
+                let mut current_scope = 0;
+                println!("'{current_scope}: Program: ");
+                current_scope += 1;
+                func.print(1, &mut current_scope);
             }
         }
     }
 }
 
 impl FuncDecl {
-    fn print(&self, depth: usize) {
+    fn print(&self, depth: usize, scope: &mut u64) {
         let indentation = INDENT.repeat(depth);
         match self {
-            FuncDecl::Func(ref indentifier, ref statements) => {
-                println!("{indentation}fn {indentifier} -> int\n{indentation}params: ()\n{indentation}body:");
-                for statement in statements {
-                    statement.print(2);
+            FuncDecl::Func(ref indentifier, ref block_items) => {
+                let mut current_scope = *scope;
+                println!("'{current_scope}:{indentation}fn {indentifier} -> int\n'{current_scope}:{indentation}params: ()\n'{current_scope}:{indentation}body:");
+                current_scope += 1;
+                *scope += 1;
+                for block_item in block_items {
+                    print!("'{current_scope}: ");
+                    block_item.print(2, scope);
+                }
+            }
+        }
+    }
+}
+
+impl BlockItem {
+    pub fn print(&self, depth: usize, scope: &mut u64) {
+        match self {
+            Self::Statement(statement) => statement.print(depth, scope),
+            Self::Declaration(declaration) => declaration.print(depth, scope),
+        }
+    }
+}
+
+impl Declaration {
+    pub fn print(&self, depth: usize, scope: &mut u64) {
+        match self {
+            Self::Declare(name, optional_expression, optional_child_declaration) => {
+                let indentation = INDENT.repeat(depth);
+                if let Some(expr) = optional_expression {
+                    print!("{indentation}int {name} = ");
+                    expr.print();
+                    println!();
+                } else {
+                    println!("{indentation}int {name}");
+                }
+                if let Some(child_declaration) = optional_child_declaration.as_ref() {
+                    child_declaration.print(depth, scope);
                 }
             }
         }
@@ -98,48 +142,41 @@ impl FuncDecl {
 }
 
 impl Statement {
-    pub fn print(&self, depth: usize) {
+    pub fn print(&self, depth: usize, scope: &mut u64) {
         let indentation = INDENT.repeat(depth);
+        let mut current_scope = *scope;
         match self {
             Statement::Return(ref exp) => {
                 print!("{indentation}return ");
                 exp.print();
                 println!();
             }
-            Statement::Declare(name, expression) => {
-                if let Some(expr) = expression {
-                    print!("{indentation}int {name} = ");
-                    expr.print();
-                    println!();
-                } else {
-                    println!("{indentation}int {name}");
-                }
-            }
             Statement::Expression(expr) => {
                 print!("{indentation}");
                 expr.print();
                 println!();
             }
-            Statement::Conditional(expression, if_children, optional_else_children) => {
+            Statement::Conditional(expression, if_child, optional_else_child) => {
                 print!("{indentation}if ");
                 expression.print();
                 println!(" :");
-                for child in if_children {
-                    child.print(depth + 1);
-                }
-                if let Some(else_children) = optional_else_children {
-                    println!("{indentation}else: ");
-                    for child in else_children {
-                        child.print(depth + 1);
-                    }
+                print!("'{current_scope}:");
+                if_child.print(depth + 1, scope);
+                if let Some(else_child) = optional_else_child.as_ref() {
+                    println!("'{}{indentation}else: ", current_scope);
+                    print!("'{current_scope}:");
+                    else_child.print(depth + 1, scope);
                 }
             }
             Self::Block(statements) => {
+                *scope += 1;
+                current_scope += 1;
                 println!("{indentation}begin");
                 for statement in statements {
-                    statement.print(depth + 1);
+                    print!("'{current_scope}:");
+                    statement.print(depth + 1, scope);
                 }
-                println!("{indentation}end");
+                println!("'{}:{indentation}end", current_scope - 1);
             }
         }
     }

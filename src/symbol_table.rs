@@ -1,21 +1,26 @@
-use crate::parser::fail;
+#[macro_use]
+use crate::fail;
+
 use std::collections::HashMap;
 
-#[repr(transparent)]
-pub struct SymbolTable(HashMap<String, String>);
+// #[repr(transparent)]
+pub struct SymbolTable(HashMap<String, String>, u64);
 
 impl SymbolTable {
     pub fn new() -> Self {
         Self {
             0: HashMap::default(),
+            1: 0,
         }
     }
 
-    pub fn add(&mut self, name: String, location: String) {
+    pub fn allocate(&mut self, name: String, size: u64) -> String {
         if !self.0.contains_key(&name) {
-            self.0.insert(name, location);
+            let location = self.gen_location(size);
+            self.0.insert(name, location.clone());
+            location
         } else {
-            fail(format!("Duplicate variable {name}, declared already"));
+            fail!("Duplicate variable {name}, declared already");
         }
     }
 
@@ -30,5 +35,10 @@ impl SymbolTable {
         } else {
             None
         }
+    }
+
+    pub fn gen_location(&mut self, allocation: u64) -> String {
+        self.1 += allocation;
+        format!("-{}(%rbp)", self.1)
     }
 }
