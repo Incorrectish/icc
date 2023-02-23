@@ -8,9 +8,8 @@ use crate::{
 // does exactly what you think
 #[macro_export]
 macro_rules! fail {
-    ($msg:expr) => {
-        crate::parser::fail(format!($msg))
-    };
+    ($fmt:expr, $($arg:tt)+) => (crate::parser::fail(format!($fmt, $($arg)+)));
+    ($msg:expr) => (crate::parser::fail(format!("{}", $msg)));
 }
 
 pub fn fail(message: String) -> ! {

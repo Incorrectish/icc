@@ -155,13 +155,13 @@ impl Statement {
                 println!();
             }
             Statement::Conditional(expression, if_child, optional_else_child) => {
-                print!("{indentation}'{parent_scope}if ");
+                print!("{indentation}'{parent_scope}: if ");
                 expression.print();
                 println!(" :");
-                print!("'{parent_scope}:");
+                // print!("'{parent_scope}:");
                 if_child.print(depth + 1, scope, parent_scope);
                 if let Some(else_child) = optional_else_child.as_ref() {
-                    println!("'{}{indentation}else: ", parent_scope);
+                    println!("{indentation}'{}: else: ", parent_scope);
                     else_child.print(depth + 1, scope, parent_scope);
                 }
             }
