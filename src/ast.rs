@@ -88,24 +88,23 @@ impl Prog {
                 let mut current_scope = 0;
                 println!("'{current_scope}: Program: ");
                 current_scope += 1;
-                func.print(1, &mut current_scope);
+                let curr_clone = current_scope;
+                func.print(1, &mut current_scope, curr_clone);
             }
         }
     }
 }
 
 impl FuncDecl {
-    fn print(&self, depth: usize, scope: &mut u64) {
+    fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         let indentation = INDENT.repeat(depth);
         match self {
             FuncDecl::Func(ref indentifier, ref block_items) => {
-                let mut current_scope = *scope;
-                println!("'{current_scope}:{indentation}fn {indentifier} -> int\n'{current_scope}:{indentation}params: ()\n'{current_scope}:{indentation}body:");
-                current_scope += 1;
+                println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: ()\n{indentation}'{parent_scope}: body:");
                 *scope += 1;
+                let curr_scope = *scope;
                 for block_item in block_items {
-                    print!("'{current_scope}: ");
-                    block_item.print(2, scope);
+                    block_item.print(2, scope, curr_scope);
                 }
             }
         }
@@ -113,28 +112,28 @@ impl FuncDecl {
 }
 
 impl BlockItem {
-    pub fn print(&self, depth: usize, scope: &mut u64) {
+    pub fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         match self {
-            Self::Statement(statement) => statement.print(depth, scope),
-            Self::Declaration(declaration) => declaration.print(depth, scope),
+            Self::Statement(statement) => statement.print(depth, scope, parent_scope),
+            Self::Declaration(declaration) => declaration.print(depth, parent_scope),
         }
     }
 }
 
 impl Declaration {
-    pub fn print(&self, depth: usize, scope: &mut u64) {
+    pub fn print(&self, depth: usize, parent_scope: u64) {
         match self {
             Self::Declare(name, optional_expression, optional_child_declaration) => {
                 let indentation = INDENT.repeat(depth);
                 if let Some(expr) = optional_expression {
-                    print!("{indentation}int {name} = ");
+                    print!("{indentation}'{parent_scope}: int {name} = ");
                     expr.print();
                     println!();
                 } else {
-                    println!("{indentation}int {name}");
+                    println!("{indentation}'{parent_scope}: int {name}");
                 }
                 if let Some(child_declaration) = optional_child_declaration.as_ref() {
-                    child_declaration.print(depth, scope);
+                    child_declaration.print(depth, parent_scope);
                 }
             }
         }
@@ -142,41 +141,40 @@ impl Declaration {
 }
 
 impl Statement {
-    pub fn print(&self, depth: usize, scope: &mut u64) {
+    pub fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         let indentation = INDENT.repeat(depth);
-        let mut current_scope = *scope;
         match self {
             Statement::Return(ref exp) => {
-                print!("{indentation}return ");
+                print!("{indentation}'{parent_scope}:return ");
                 exp.print();
                 println!();
             }
             Statement::Expression(expr) => {
-                print!("{indentation}");
+                print!("{indentation}'{parent_scope}:");
                 expr.print();
                 println!();
             }
             Statement::Conditional(expression, if_child, optional_else_child) => {
-                print!("{indentation}if ");
+                print!("{indentation}'{parent_scope}if ");
                 expression.print();
                 println!(" :");
-                print!("'{current_scope}:");
-                if_child.print(depth + 1, scope);
+                print!("'{parent_scope}:");
+                if_child.print(depth + 1, scope, parent_scope);
                 if let Some(else_child) = optional_else_child.as_ref() {
-                    println!("'{}{indentation}else: ", current_scope);
-                    print!("'{current_scope}:");
-                    else_child.print(depth + 1, scope);
+                    println!("'{}{indentation}else: ", parent_scope);
+                    else_child.print(depth + 1, scope, parent_scope);
                 }
             }
             Self::Block(statements) => {
                 *scope += 1;
-                current_scope += 1;
-                println!("{indentation}begin");
+                // current_scope += 1;
+                let curr_scope = *scope;
+                println!("{indentation}'{parent_scope}: begin");
                 for statement in statements {
-                    print!("'{current_scope}:");
-                    statement.print(depth + 1, scope);
+                    // print!("'{current_scope}:");
+                    statement.print(depth + 1, scope, curr_scope);
                 }
-                println!("'{}:{indentation}end", current_scope - 1);
+                println!("{indentation}'{}: end", parent_scope);
             }
         }
     }
