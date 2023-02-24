@@ -88,7 +88,7 @@ impl Lexer {
                             match next_token {
                                 Some(Token::Identifier(name)) => Some(Token::PrefixDecrement(name)),
                                 Some(Token::IntegerLiteral(int)) => {
-                                    fail!("Cannot increment a temporary value {int}")
+                                    fail!("Cannot increment a temporary value {}", int)
                                 }
                                 _ => {
                                     unreachable!("Cannot increment something other than a variable")
@@ -131,7 +131,7 @@ impl Lexer {
                             match next_token {
                                 Some(Token::Identifier(name)) => Some(Token::PrefixIncrement(name)),
                                 Some(Token::IntegerLiteral(int)) => {
-                                    fail!("Cannot increment a temporary value {int}")
+                                    fail!("Cannot increment a temporary value {}", int)
                                 }
                                 _ => {
                                     unreachable!("Cannot increment something other than a variable")

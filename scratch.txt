@@ -1,0 +1,22 @@
+0: if (...) {
+    1: int a = 5;
+    1: {
+        2: {
+           3: a += 1 
+        2: }
+    1: }
+    1: return a;
+0: }
+0: if (...) {
+   4: int b = 7;
+0: }
+a needs to be able to be accessed in any children of 1. Scopes which have a
+number greater than 1 may not be children. a can be accessed in 1, 2, 3 but not
+Within 3, it's parents are 2, 1, 0 parents of 1 is just 0
+4
+
+IDEA: track each scope as a vector of scopes: current along with all its
+subordinate scopes. the scope of a would be 1, and then the parents of three
+would be 3, 2, 1. Because 1 is contained within the scope's parents, it's okay
+to modify a
+

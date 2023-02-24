@@ -1,6 +1,5 @@
 use crate::{
-    assembly::*,
-    ast::{self, BinaryOperator, Expression},
+    ast::{self, BinaryOperator},
     lexer::Lexer,
     token::Token,
 };
@@ -9,7 +8,7 @@ use crate::{
 #[macro_export]
 macro_rules! fail {
     ($fmt:expr, $($arg:tt)+) => (crate::parser::fail(format!($fmt, $($arg)+)));
-    ($msg:expr) => (crate::parser::fail(format!("{}", $msg)));
+    ($msg:expr) => (crate::parser::fail(format!($msg)));
 }
 
 pub fn fail(message: String) -> ! {
@@ -66,7 +65,7 @@ impl Parser {
         // TODO: fix this in case it is not working
 
         let mut statements = vec![];
-        while let Some(mut statement) = self.parse_block_item() {
+        while let Some(statement) = self.parse_block_item() {
             statements.push(statement);
         }
 

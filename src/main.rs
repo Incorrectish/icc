@@ -8,6 +8,7 @@ mod lexer;
 mod parser;
 mod symbol_table;
 mod token;
+mod scope;
 
 fn main() {
     // Command args contain the binary directory relative path as the first argument, so the second
@@ -41,12 +42,14 @@ fn compile(filename: &Path) {
     // fs::remove_file(&asm_file).expect("Failed to delete file");
 }
 
+#[allow(unused)]
 fn test_lexer(filename: &Path) {
     let file_string = fs::read_to_string(filename).expect("Couldn't open file");
     println!("{file_string}");
     dbg!(Lexer::new(file_string).collect::<Vec<_>>());
 }
 
+#[allow(unused)]
 fn test_ast(filename: &Path) {
     let file_string = fs::read_to_string(filename).expect("Couldn't open file");
     // println!("{file_string}");

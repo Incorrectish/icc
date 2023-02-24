@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 // Indentation for pretty printing, made a constant so size can be easily changed
 pub const INDENT: &str = "    ";
 

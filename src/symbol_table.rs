@@ -1,6 +1,6 @@
-use crate::fail;
-
 use std::collections::HashMap;
+
+use crate::fail;
 
 // #[repr(transparent)]
 pub struct SymbolTable {
@@ -17,6 +17,7 @@ impl SymbolTable {
         }
     }
 
+    #[allow(unused)]
     pub fn print(&self) {
         println!("Symbol Table: ");
         for (key, value) in &self.symbol_table {
@@ -25,70 +26,52 @@ impl SymbolTable {
         }
     }
 
-    pub fn allocate(&mut self, name: String, scope: u64, size: u64, parent_scope: u64) -> String {
-        let key = (name, scope);
-        if !self.symbol_table.contains_key(&key) {
-            if self
-                .newest_mem_locations_and_allocation_sizes_by_scope
-                .contains_key(&scope)
-            {
-                let location = self.gen_location(size, scope);
-                self.symbol_table.insert(key, location.clone());
-                self.print();
-                location
-            } else {
-                // create top of stack for scope
-                if self
-                    .newest_mem_locations_and_allocation_sizes_by_scope
-                    .contains_key(&parent_scope)
-                {
-                    self.newest_mem_locations_and_allocation_sizes_by_scope
-                        .insert(
-                            scope,
-                            (
-                                self.newest_mem_locations_and_allocation_sizes_by_scope
-                                    [&parent_scope]
-                                    .0,
-                                0,
-                            ),
-                        );
-                    let location = self.gen_location(size, scope);
-                    self.symbol_table.insert(key, location.clone());
-                self.print();
-                    location
-                } else {
-                    // This means the parent scope hasn't even been created, which means the top of
-                    // the stack and allocations should just be 0
-                    self.newest_mem_locations_and_allocation_sizes_by_scope
-                        .insert(parent_scope, (0, 0));
-                    self.newest_mem_locations_and_allocation_sizes_by_scope
-                        .insert(
-                            scope,
-                            (
-                                self.newest_mem_locations_and_allocation_sizes_by_scope
-                                    [&parent_scope]
-                                    .0,
-                                0,
-                            ),
-                        );
-                    let location = self.gen_location(size, scope);
-                    self.symbol_table.insert(key, location.clone());
-                self.print();
-                    location
+    pub fn allocate(&mut self, name: String, parent_scopes: &Vec<u64>, size: u64, /* parent_scope: u64 */) -> String {
+        for i in (0..parent_scopes.len()).rev() {
+            // Look for the first scope that is defined, and give all its children scopes its
+            // top_of_stack and 0 for their allocations
+            let scope = parent_scopes[i];
+            if self.newest_mem_locations_and_allocation_sizes_by_scope.contains_key(&scope) {
+                let top_of_stack = self.newest_mem_locations_and_allocation_sizes_by_scope[&scope].0;
+                for j in (i+1)..parent_scopes.len() {
+                    self.newest_mem_locations_and_allocation_sizes_by_scope.insert(parent_scopes[j], (top_of_stack, 0));
+                    dbg!(j);
+                }
+                break;
+            }
+            if i == 0 {
+                for j in 0..parent_scopes.len() {
+                    self.newest_mem_locations_and_allocation_sizes_by_scope.insert(parent_scopes[j], (0, 0));
                 }
             }
-        } else {
-            self.print();
-            fail!("Duplicate variable {name}, declared already");
         }
+        let curr_scope = *parent_scopes.last().expect("This vector should never be empty");
+        dbg!(parent_scopes);
+        dbg!(curr_scope);
+        let new_location = self.gen_location(size, curr_scope);
+        if self.symbol_table.contains_key(&(name.clone(), curr_scope)) {
+            fail!("Variable {name} already defined in scope '{curr_scope}");
+        } else {
+            self.symbol_table.insert((name, curr_scope), new_location.clone());
+        }
+        new_location
     }
 
+    #[allow(unused)]
     pub fn remove(&mut self, key: &(String, u64)) {
         self.symbol_table.remove(key);
     }
 
-    pub fn get(&self, key: &(String, u64)) -> Option<&String> {
-        self.symbol_table.get(key)
+    pub fn get(&self, name: &String, parent_scopes: &Vec<u64>) -> Option<&String> {
+        let mut key = (name.clone(), 0u64);
+        for i in parent_scopes.iter().rev() {
+            key.1 = *i;
+            let value = self.symbol_table.get(&key);
+            if value.is_some() {
+                return value;
+            }
+        }
+        None
     }
 
     pub fn gen_location(&mut self, allocation: u64, scope: u64) -> String {
