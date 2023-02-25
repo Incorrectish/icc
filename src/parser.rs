@@ -12,8 +12,9 @@ macro_rules! fail {
 }
 
 pub fn fail(message: String) -> ! {
-    eprintln!("{}: {message}", "Error".bold().red());
-    std::process::exit(0);
+    panic!("{}: {message}", "Error".bold().red());
+    // eprintln!("{}: {message}", "Error".bold().red());
+    // std::process::exit(0);
 }
 
 use colored::Colorize;
@@ -82,13 +83,12 @@ impl Parser {
         let token = self.lexer.peek().expect("Invalid token sequence");
         match token {
             Token::KeywordInt => {
-                let _ = self.lexer.next();
-                let ret = Some(ast::BlockItem::Declaration(
-                    self.parse_assignment_statement(),
-                ));
-                let Some(Token::Semicolon) = self.lexer.next() else {
-                    fail!("Missing semicolon, :(")
-                };
+                let _ = self.lexer.next(); 
+                dbg!(self.lexer.peek());
+                let ret = Some(ast::BlockItem::Declaration(self.parse_declaration()));
+                // let Some(Token::Semicolon) = self.lexer.next() else {
+                //     fail!("Missing semicolon, :( {:?}", self.lexer.clone().collect::<Vec<_>>())
+                // };
                 ret
             }
             _ => {
@@ -128,7 +128,150 @@ impl Parser {
                 let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
                 Some(ast::Statement::Block(block_statements))
             }
+            Token::KeywordBreak => {
+                let _ = self.lexer.next();
+                let next = self.lexer.next();
+                if !matches!(next, Some(Token::Semicolon)) {
+                    fail!("Missing semicolon, got {token:?} instead");
+                }
+                Some(ast::Statement::Break)
+            }
+            Token::KeywordFor => self.parse_for_loop(),
+            Token::KeywordDo => {
+                let _ = self.lexer.next();
+                let statement = self
+                    .parse_statement()
+                    .expect("Expected statement after \"do\"");
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::KeywordWhile)) {
+                    fail!("Expected while, got {token:?}");
+                }
+                if !matches!(token, Some(Token::OpenParen)) {
+                    fail!("Expected opening parentheses, got {token:?}");
+                }
+                let expression = self.parse_expression();
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::CloseParen)) {
+                    fail!("Expected closing parentheses, got {token:?}");
+                }
+                Some(ast::Statement::Do(Box::new(statement), expression))
+            }
+            Token::KeywordWhile => {
+                let _ = self.lexer.next();
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::OpenParen)) {
+                    fail!("Expected opening parentheses, got {token:?}");
+                }
+                let expression = self.parse_expression();
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::CloseParen)) {
+                    fail!("Expected closing parentheses, got {token:?}");
+                }
+                let statement = self
+                    .parse_statement()
+                    .expect("Expected body, got closing curly brace");
+                Some(ast::Statement::While(expression, Box::new(statement)))
+            }
+            Token::Semicolon => {
+                let _ = self.lexer.next();
+                Some(ast::Statement::Expression(ast::Expression::NullExp))
+                // Token::Semicolon => todo!("Null statement"),
+            }
+            Token::KeywordContinue => {
+                let _ = self.lexer.next();
+                let next = self.lexer.next();
+                if !matches!(next, Some(Token::Semicolon)) {
+                    fail!("Missing semicolon, got {token:?} instead");
+                }
+                Some(ast::Statement::Continue)
+            }
             _ => panic!("Is this the token: {token:?}?"),
+        }
+    }
+
+    fn parse_for_loop(&mut self) -> Option<ast::Statement> {
+        let _ = self.lexer.next();
+        let open_paren = self.lexer.next();
+        if !matches!(open_paren, Some(Token::OpenParen)) {
+            fail!("Expected opening parentheses, got {open_paren:?}");
+        }
+        let potential_decl = self.lexer.peek();
+        if matches!(potential_decl, Some(Token::KeywordInt)) {
+            let _ = self.lexer.next();
+            let declaration = self.parse_declaration();
+            dbg!(self.lexer.peek());
+            let expression = self.parse_expression();
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::Semicolon)) {
+                fail!("Expected semicolon, got {token:?}")
+            }
+            let token = self.lexer.peek();
+            if let Some(Token::CloseParen) = token {
+                let _ = self.lexer.next();
+                let statement = self
+                    .parse_statement()
+                    .expect("For loop needs a statement succeeding it");
+                Some(ast::Statement::ForDecl(
+                    declaration,
+                    expression,
+                    None,
+                    Box::new(statement),
+                ))
+            } else {
+                let exp2 = self.parse_expression();
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::CloseParen)) {
+                    fail!("Expected semicolon, got {token:?}")
+                }
+                let statement = self
+                    .parse_statement()
+                    .expect("For loop needs a statement succeeding it");
+                Some(ast::Statement::ForDecl(
+                    declaration,
+                    expression,
+                    Some(exp2),
+                    Box::new(statement),
+                ))
+            }
+        } else {
+            let exp1 = self.parse_expression();
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::CloseParen)) {
+                fail!("Expected semicolon, got {token:?}")
+            }
+            let expression = self.parse_expression();
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::CloseParen)) {
+                fail!("Expected closing parentheses, got {token:?}")
+            }
+            let token = self.lexer.peek();
+            if let Some(Token::CloseParen) = token {
+                let _ = self.lexer.next();
+                let statement = self
+                    .parse_statement()
+                    .expect("For loop needs a statement succeeding it");
+                Some(ast::Statement::For(
+                    Some(exp1),
+                    expression,
+                    None,
+                    Box::new(statement),
+                ))
+            } else {
+                let exp2 = self.parse_expression();
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::CloseParen)) {
+                    fail!("Expected closing parentheses, got {token:?}")
+                }
+                let statement = self
+                    .parse_statement()
+                    .expect("For loop needs a statement succeeding it");
+                Some(ast::Statement::For(
+                    Some(exp1),
+                    expression,
+                    Some(exp2),
+                    Box::new(statement),
+                ))
+            }
         }
     }
 
@@ -250,10 +393,11 @@ impl Parser {
         statement
     }
 
-    fn parse_assignment_statement(&mut self) -> ast::Declaration {
+    fn parse_declaration(&mut self) -> ast::Declaration {
         let token = self.lexer.next().expect("Invalid token sequence");
         if let Token::Identifier(variable_name) = token {
             let token = self.lexer.peek().expect("Invalid token sequence");
+            let token = dbg!(token);
             let (expression, next_assignment) = match token {
                 Token::Semicolon => (None, None),
                 Token::Assign => {
@@ -262,15 +406,17 @@ impl Parser {
                     let next_tok = self.lexer.peek();
                     let next_decl = if let Some(Token::Comma) = next_tok {
                         let _ = self.lexer.next();
-                        Some(self.parse_assignment_statement())
+                        Some(self.parse_declaration())
                     } else if let Some(Token::Semicolon) = next_tok {
+                        let see = self.lexer.next();
+                        dbg!(see);
                         None
                     } else {
                         fail(format!("Expected semicolon or comma"))
                     };
                     (exp, next_decl)
                 },
-                Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_assignment_statement()))},
+                Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_declaration()))},
                 _ => fail(format!(
                     "Expected assignment operator[=] or end of statement[;], got {token:?}, ast Node until now = :?"
                 )),
@@ -575,7 +721,7 @@ impl Parser {
                 }
             }
         }
-        _ => fail(format!("Token must be an expression, instead got {token:?}")),
+        _ => fail(format!("Token must be an expression, instead got {token:?}, lexer: \n {:?}", self.lexer.clone().collect::<Vec<_>>())),
     }
     }
 

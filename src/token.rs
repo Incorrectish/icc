@@ -20,6 +20,11 @@ pub enum Token {
     KeywordIf,                // if
     KeywordElse,              // else
     KeywordReturn,            // return
+    KeywordDo,                // do
+    KeywordFor,               // for
+    KeywordBreak,             // break
+    KeywordWhile,             // while
+    KeywordContinue,          // continue
     Identifier(String),       // [a-zA-Z]\w+
     IntegerLiteral(String),   // [0-9]+
     BitwiseComplement,        // ~

@@ -35,6 +35,11 @@ impl Lexer {
             "return" => Some(Token::KeywordReturn),
             "else" => Some(Token::KeywordElse),
             "if" => Some(Token::KeywordIf),
+            "for" => Some(Token::KeywordFor),
+            "break" => Some(Token::KeywordBreak),
+            "while" => Some(Token::KeywordWhile),
+            "do" => Some(Token::KeywordDo),
+            "continue" => Some(Token::KeywordContinue),
             _ if INTEGER_LITERAL_REGEX.is_match(curr_substr) => {
                 Some(Token::IntegerLiteral(curr_substr.to_string()))
             }

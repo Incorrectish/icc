@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use crate::ast;
+
 // Indentation for pretty printing, made a constant so size can be easily changed
 pub const INDENT: &str = "    ";
 
@@ -51,6 +53,7 @@ pub enum Expression {
     Assign(String, Box<Expression>),
     ReferenceVariable(String),
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
+    NullExp,
 }
 
 #[derive(Debug)]
@@ -59,6 +62,12 @@ pub enum Statement {
     Expression(Expression),
     Conditional(Expression, Box<Statement>, Box<Option<Statement>>),
     Block(Vec<BlockItem>),
+    For(Option<Expression>, Expression, Option<Expression>, Box<Statement>),
+    ForDecl(Declaration, Expression, Option<Expression>, Box<Statement>),
+    While(Expression, Box<Statement>),
+    Do(Box<Statement>, Expression),
+    Break,
+    Continue,
 }
 
 #[derive(Debug)]
@@ -123,7 +132,7 @@ impl BlockItem {
 }
 
 impl Declaration {
-    pub fn print(&self, depth: usize, parent_scope: u64) {
+    pub fn print(&self, depth: usize, parent_scope: u64,) {
         match self {
             Self::Declare(name, optional_expression, optional_child_declaration) => {
                 let indentation = INDENT.repeat(depth);
@@ -159,7 +168,7 @@ impl Statement {
             Statement::Conditional(expression, if_child, optional_else_child) => {
                 print!("{indentation}'{parent_scope}: if ");
                 expression.print();
-                println!(" :");
+                // println!(" :");
                 // print!("'{parent_scope}:");
                 if_child.print(depth + 1, scope, parent_scope);
                 if let Some(else_child) = optional_else_child.as_ref() {
@@ -169,14 +178,75 @@ impl Statement {
             }
             Self::Block(statements) => {
                 *scope += 1;
+                let lower_indent = INDENT.repeat(depth - 1);
                 // current_scope += 1;
                 let curr_scope = *scope;
-                println!("{indentation}'{parent_scope}: begin");
+                println!("{lower_indent}'{parent_scope}: begin");
                 for statement in statements {
                     // print!("'{current_scope}:");
-                    statement.print(depth + 1, scope, curr_scope);
+                    statement.print(depth, scope, curr_scope);
                 }
-                println!("{indentation}'{}: end", parent_scope);
+                println!("{lower_indent}'{}: end", parent_scope);
+            },
+            Self::Continue => println!("{indentation}'{parent_scope}: continue"),
+            Self::Break => println!("{indentation}'{parent_scope}: break"),
+            Self::ForDecl(decl, exp2, opt_exp3, statement) => {
+                print!("{indentation}'{parent_scope}: for ");
+                print_for_decl(decl);
+                print!(" , ");
+                exp2.print();
+                print!(" , ");
+                if let Some(exp3) = opt_exp3 {
+                    exp3.print();
+                }
+                println!();
+                statement.print(depth + 1, scope, parent_scope);
+            }
+            Self::For(opt_exp1, exp, opt_exp2, statement) => {
+                print!("{indentation}'{parent_scope}: for ");
+                if let Some(exp1) = opt_exp1 {
+                    exp1.print();
+                }
+                print!(" , ");
+                exp.print();
+                print!(" , ");
+                if let Some(exp2) = opt_exp2 {
+                    exp2.print();
+                }
+                println!();
+                statement.print(depth + 1, scope, parent_scope);
+            },
+            Self::Do(statement, exp) => {
+                println!("{indentation}'{parent_scope}: do ");
+                statement.print(depth + 1, scope, parent_scope);
+                print!("{indentation}'{parent_scope}: while ");
+                exp.print();
+                println!();
+            },
+            Self::While(exp, statement) => {
+                print!("{indentation}'{parent_scope}: while ");
+                exp.print();
+                println!();
+                statement.print(depth + 1, scope, parent_scope);
+            },
+        }
+    }
+}
+
+fn print_for_decl(decl: &Declaration) {
+    let mut opt_decl = Some(decl);
+    while let Some(decl) = opt_decl{
+        match decl {
+            ast::Declaration::Declare(ident, opt_exp, opt_decl2) => {
+                print!("int {ident}");
+                if let Some(exp) = opt_exp {
+                    print!(" ");
+                    exp.print();
+                }
+                opt_decl = opt_decl2.as_ref().as_ref();
+                if opt_decl.is_some() {
+                    print!(", ");
+                }
             }
         }
     }
@@ -185,12 +255,13 @@ impl Statement {
 impl Expression {
     pub fn print(&self) {
         match self {
+            Self::NullExp => print!(""),
             Expression::Constant(int) => print!("int<{int}>"),
             Expression::UnaryOp(operator, expression) => {
                 if matches!(
                     operator,
                     UnaryOperator::PostfixIncrement(_) | UnaryOperator::PostfixDecrement(_)
-                ) {
+                    ) {
                     print!("<");
                     expression.print();
                     print!(">");

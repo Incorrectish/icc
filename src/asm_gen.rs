@@ -106,6 +106,12 @@ impl AsmGenerator {
 
     fn gen_statement(&mut self, statement: ast::Statement, parent_scope: Vec<u64>) -> Asm {
         match statement {
+            ast::Statement::ForDecl(_, _, _, _) => todo!(),
+            ast::Statement::Continue => todo!(),
+            ast::Statement::Break => todo!(),
+            ast::Statement::While(_, _) => todo!(),
+            ast::Statement::Do(_, _) => todo!(),
+            ast::Statement::For(_, _, _, _) => todo!(),
             ast::Statement::Return(expression) => {
                 let constructed_assembly = Asm::new(
                     self.gen_expression(expression, parent_scope),
@@ -186,6 +192,7 @@ impl AsmGenerator {
 
     fn gen_expression(&mut self, expr: ast::Expression, parent_scope: Vec<u64>) -> Asm {
         match expr {
+            ast::Expression::NullExp => todo!(),
             ast::Expression::Constant(int) => {
                 Asm::instruction("movq".to_string(), format!("${int},%rax"))
             }

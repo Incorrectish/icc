@@ -1,14 +1,10 @@
 int main() {
     int a = 7;
-    {
-        int a = 3;
-        {
-            a += 1;
+    for (int i = 0; i < 5; i++) {
+        if (i == 3) {
+            a += 4;    
+            continue;
         }
-    }
-    {
         a += 2;
     }
-    int a = 5;
-    return a;
 }
