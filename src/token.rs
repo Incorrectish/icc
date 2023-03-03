@@ -37,8 +37,8 @@ pub enum Token {
     BitwiseAnd,               // &
     BitwiseOr,                // |
     Xor,                      // ^
-    Greater,                  // >
-    Less,                     // <
+    GreaterThan,              // >
+    LessThan,                 // <
     Assign,                   // =
     Colon,                    // :
     Question,                 //?
@@ -59,9 +59,9 @@ pub enum Token {
     BitwiseRightShiftAssign,  // >>=
     LogicalAnd,               // &&
     LogicalOr,                // ||
-    Equal,                    // ==
-    GreaterEq,                // >=
-    LessEq,                   // <=
+    EqualTo,                  // ==
+    GreaterThanOrEqualTo,     // >=
+    LessThanOrEqualTo,        // <=
     NotEqual,                 // !=
     BitwiseLeftShift,         // <<
     BitwiseRightShift,        // >>

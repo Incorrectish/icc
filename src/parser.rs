@@ -84,7 +84,7 @@ impl Parser {
         match token {
             Token::KeywordInt => {
                 let _ = self.lexer.next(); 
-                dbg!(self.lexer.peek());
+                self.lexer.peek();
                 let ret = Some(ast::BlockItem::Declaration(self.parse_declaration()));
                 // let Some(Token::Semicolon) = self.lexer.next() else {
                 //     fail!("Missing semicolon, :( {:?}", self.lexer.clone().collect::<Vec<_>>())
@@ -146,13 +146,18 @@ impl Parser {
                 if !matches!(token, Some(Token::KeywordWhile)) {
                     fail!("Expected while, got {token:?}");
                 }
+                let token = self.lexer.next();
                 if !matches!(token, Some(Token::OpenParen)) {
-                    fail!("Expected opening parentheses, got {token:?}");
+                    fail!("Expected obening parentheses, got {token:?}");
                 }
                 let expression = self.parse_expression();
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::CloseParen)) {
                     fail!("Expected closing parentheses, got {token:?}");
+                }
+                let token = self.lexer.next();
+                if !matches!(token, Some(Token::Semicolon)) {
+                    fail!("Expected semicolon, got {token:?}");
                 }
                 Some(ast::Statement::Do(Box::new(statement), expression))
             }
@@ -199,7 +204,6 @@ impl Parser {
         if matches!(potential_decl, Some(Token::KeywordInt)) {
             let _ = self.lexer.next();
             let declaration = self.parse_declaration();
-            dbg!(self.lexer.peek());
             let expression = self.parse_expression();
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
@@ -397,7 +401,6 @@ impl Parser {
         let token = self.lexer.next().expect("Invalid token sequence");
         if let Token::Identifier(variable_name) = token {
             let token = self.lexer.peek().expect("Invalid token sequence");
-            let token = dbg!(token);
             let (expression, next_assignment) = match token {
                 Token::Semicolon => (None, None),
                 Token::Assign => {
@@ -408,8 +411,9 @@ impl Parser {
                         let _ = self.lexer.next();
                         Some(self.parse_declaration())
                     } else if let Some(Token::Semicolon) = next_tok {
-                        let see = self.lexer.next();
-                        dbg!(see);
+                        let _semicolon = self.lexer.next();
+                        // let see = self.lexer.next();
+                        // dbg!(see);
                         None
                     } else {
                         fail(format!("Expected semicolon or comma"))
@@ -563,7 +567,7 @@ impl Parser {
         let mut term = self.parse_relational_expr();
         loop {
             let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::Equal) | Some(Token::NotEqual)) {
+            if !matches!(operation, Some(Token::EqualTo) | Some(Token::NotEqual)) {
                 return term;
             }
             let operation = Self::parse_to_op(self.lexer.next().unwrap());
@@ -578,10 +582,10 @@ impl Parser {
             let operation = self.lexer.peek();
             if !matches!(
                 operation,
-                Some(Token::LessEq)
-                    | Some(Token::GreaterEq)
-                    | Some(Token::Less)
-                    | Some(Token::Greater)
+                Some(Token::LessThanOrEqualTo)
+                    | Some(Token::GreaterThanOrEqualTo)
+                    | Some(Token::LessThan)
+                    | Some(Token::GreaterThan)
             ) {
                 return term;
             }
@@ -737,11 +741,11 @@ impl Parser {
             Token::Xor => ast::BinaryOperator::Xor,
             Token::BitwiseRightShift => ast::BinaryOperator::BitwiseRightShift,
             Token::BitwiseLeftShift => ast::BinaryOperator::BitwiseLeftShift,
-            Token::Greater => ast::BinaryOperator::Greater,
-            Token::GreaterEq => ast::BinaryOperator::GreaterEq,
-            Token::Less => ast::BinaryOperator::Less,
-            Token::LessEq => ast::BinaryOperator::LessEq,
-            Token::Equal => ast::BinaryOperator::Equal,
+            Token::GreaterThan => ast::BinaryOperator::Greater,
+            Token::GreaterThanOrEqualTo => ast::BinaryOperator::GreaterEq,
+            Token::LessThan => ast::BinaryOperator::Less,
+            Token::LessThanOrEqualTo => ast::BinaryOperator::LessEq,
+            Token::EqualTo => ast::BinaryOperator::Equal,
             Token::NotEqual => ast::BinaryOperator::NotEqual,
             Token::LogicalOr => ast::BinaryOperator::LogicalOr,
             Token::LogicalAnd => ast::BinaryOperator::LogicalAnd,

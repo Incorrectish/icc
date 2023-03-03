@@ -97,26 +97,29 @@ impl Prog {
         match self {
             Prog::Prog(ref func) => {
                 let mut current_scope = 0;
+                let immut_curr_scope = current_scope;
                 println!("'{current_scope}: Program: ");
                 current_scope += 1;
                 let curr_clone = current_scope;
                 func.print(1, &mut current_scope, curr_clone);
+                println!("'{immut_curr_scope}: EndProgram");
             }
         }
     }
 }
 
 impl FuncDecl {
-    fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
+    pub fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         let indentation = INDENT.repeat(depth);
         match self {
             FuncDecl::Func(ref indentifier, ref block_items) => {
-                println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: ()\n{indentation}'{parent_scope}: body:");
+                println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: ()\n{indentation}'{parent_scope}: begin:");
                 *scope += 1;
                 let curr_scope = *scope;
                 for block_item in block_items {
                     block_item.print(2, scope, curr_scope);
                 }
+                println!("{indentation}'{parent_scope}: end")
             }
         }
     }
@@ -161,13 +164,14 @@ impl Statement {
                 println!();
             }
             Statement::Expression(expr) => {
-                print!("{indentation}'{parent_scope}:");
+                print!("{indentation}'{parent_scope}: ");
                 expr.print();
                 println!();
             }
             Statement::Conditional(expression, if_child, optional_else_child) => {
                 print!("{indentation}'{parent_scope}: if ");
                 expression.print();
+                println!();
                 // println!(" :");
                 // print!("'{parent_scope}:");
                 if_child.print(depth + 1, scope, parent_scope);
@@ -233,7 +237,7 @@ impl Statement {
     }
 }
 
-fn print_for_decl(decl: &Declaration) {
+pub fn print_for_decl(decl: &Declaration) {
     let mut opt_decl = Some(decl);
     while let Some(decl) = opt_decl{
         match decl {

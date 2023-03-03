@@ -8,6 +8,7 @@ use std::mem;
 #[derive(Debug, Clone)]
 pub struct Lexer {
     pos: usize,
+    line_number: usize,
     input: String,
     curr_substr: String,
     curr_token: Option<Token>,
@@ -18,6 +19,7 @@ impl Lexer {
     pub fn new(input: String) -> Self {
         let mut lexer = Self {
             pos: 0,
+            line_number: 0,
             input,
             curr_substr: String::new(),
             curr_token: None,
@@ -205,7 +207,7 @@ impl Lexer {
             '>' => {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
-                    Some(Token::GreaterEq)
+                    Some(Token::GreaterThanOrEqualTo)
                 } else if next_char == Some(&('>' as u8)) {
                     self.pos += 1;
                     let third_char = self.input.as_bytes().get(self.pos);
@@ -216,13 +218,13 @@ impl Lexer {
                         Some(Token::BitwiseRightShift)
                     }
                 } else {
-                    Some(Token::Greater)
+                    Some(Token::GreaterThan)
                 }
             }
             '<' => {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
-                    Some(Token::LessEq)
+                    Some(Token::LessThanOrEqualTo)
                 } else if next_char == Some(&('<' as u8)) {
                     self.pos += 1;
                     let third_char = self.input.as_bytes().get(self.pos);
@@ -233,13 +235,13 @@ impl Lexer {
                         Some(Token::BitwiseLeftShift)
                     }
                 } else {
-                    Some(Token::Less)
+                    Some(Token::LessThan)
                 }
             }
             '=' => {
                 if next_char == Some(&('=' as u8)) {
                     self.pos += 1;
-                    Some(Token::Equal)
+                    Some(Token::EqualTo)
                 } else {
                     Some(Token::Assign)
                 }
@@ -309,12 +311,28 @@ impl Lexer {
         while self.pos < self.input.len()
             && (self.input.as_bytes()[self.pos] as char).is_whitespace()
         {
+            // TODO: windows compatibility???????
+            if self.input.as_bytes()[self.pos] as char == '\n' {
+                self.line_number += 1;
+            }
             self.pos += 1;
         }
     }
 
     pub fn get_rest_of_input(&self) -> String {
         self.input.split_at(self.pos).1.into()
+    }
+
+    fn get_line_at_position(s: &str, position: usize) -> Option<&str> {
+        // Search backwards from the position to the previous newline character
+        let start = s[..position].rfind('\n').map_or(0, |i| i + 1);
+        // Search forwards from the position to the next newline character
+        let end = s[position..].find('\n').map_or(s.len(), |i| position + i + 1);
+        if start < end {
+            Some(&s[start..end])
+        } else {
+            None
+        }
     }
 }
 

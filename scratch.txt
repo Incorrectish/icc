@@ -20,3 +20,32 @@ subordinate scopes. the scope of a would be 1, and then the parents of three
 would be 3, 2, 1. Because 1 is contained within the scope's parents, it's okay
 to modify a
 
+
+
+
+
+
+
+
+
+
+
+let C be some something
+Simple case: while:
+while(expression) statement
+
+
+.startofwhile:
+gen_expr
+cmpq $0,%eax
+je .endofwhile 
+gen_stmt
+jmp .startofwhile
+.endofwhile:
+
+
+
+
+
+
+

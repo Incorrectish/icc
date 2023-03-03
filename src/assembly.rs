@@ -1,10 +1,12 @@
 use std::{collections::VecDeque, fs, io::Write, mem, path::Path};
 
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct Asm {
     instructions: VecDeque<AsmInstr>,
 }
 
+#[derive(Debug)]
 pub struct AsmInstr {
     command: String,
     arguments: String,
@@ -34,6 +36,10 @@ impl AsmInstr {
     pub fn command(&self) -> &str {
         &self.command
     }
+
+    pub fn print(&self) {
+        print!("{} {}", self.command, self.arguments);
+    }
 }
 
 impl Default for Asm {
@@ -45,6 +51,16 @@ impl Default for Asm {
 }
 
 impl Asm {
+    pub fn print(&self) {
+        println!();
+        for instr in &self.instructions {
+            instr.print();
+            println!();
+        }
+        println!();
+    }
+
+    
     pub fn from_instr(instructions: Vec<AsmInstr>, mut assembly: Asm) -> Self {
         let mut result = Asm {
             instructions: mem::take(&mut assembly.instructions),
@@ -88,8 +104,12 @@ impl Asm {
         assembly
     }
 
-    pub fn last(&self) -> &AsmInstr {
-        &self.instructions[self.instructions.len() - 1]
+    pub fn last(&self) -> Option<&AsmInstr> {
+        if self.instructions.len() > 0 {
+            Some(&self.instructions[self.instructions.len() - 1])
+        } else {
+            None
+        }
     }
 
     pub fn write(mut assembly: Asm, to: &Path) -> std::io::Result<()> {
@@ -160,7 +180,7 @@ impl Asm {
     // index1
     // for example if instruction at index1 is `pushl $5`, instruction at index2 is `popl %eax`,
     // and new_command is `movq`, index1 will be removed, and the instruction at index2 becomes
-    // `movq $5, %eax`
+    // `movq $5, %rax`
     // THIS WILL BREAK IF THE ARGUMENT FOR one of them is something like `value, location`, IT
     // CANNOT HANDLE ARGUMENTS THAT HAVE > 1 arg
     // This also assumes index1 and index2 are in bounds, it will panic if it is out of bounds
