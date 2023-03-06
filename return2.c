@@ -1,5 +1,14 @@
 int main() {
-    int x = 0;
-    do{x++;}while(x<9);
-    return x;
+    int i = 0;
+    {
+        {
+            i += 9;
+            int i = 0;
+        }
+    }
+    {
+        int i = 1;
+        i++;
+    }
+    return i;
 }

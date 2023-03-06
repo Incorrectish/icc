@@ -42,11 +42,12 @@ impl SymbolTable {
     }
 
     pub fn create_scope(&mut self, scope: u64, parent: u64) {
+        println!("Creating scope '{scope} with parent '{parent}");
         self.parents.insert(scope, Some(parent));
         self.newest_mem_locations_and_allocation_sizes_by_scope
             .insert(
                 scope,
-                self.newest_mem_locations_and_allocation_sizes_by_scope[&scope],
+                *self.newest_mem_locations_and_allocation_sizes_by_scope.get(&parent).expect(&format!("scope '{scope} not created")),
             );
     }
 
@@ -106,7 +107,7 @@ impl SymbolTable {
 
     pub fn get(&self, name: &String, scope: u64) -> Option<&String> {
         let mut key = (name.clone(), 0u64);
-        let parent = Some(scope);
+        let mut parent = Some(scope);
         while let Some(curr_scope) = parent {
             key.1 = curr_scope;
             let value = self.symbol_table.get(&key);

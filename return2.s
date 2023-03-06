@@ -4,36 +4,19 @@ pushq %rbp
 movq %rsp,%rbp
 movq $0,%rax
 movq %rax,-8(%rbp)
+movq -8(%rbp),%rax
+movq %rax,%rbx
+movq $9,%rax
+xchg %rbx,%rax
+addq %rbx,%rax
+movq %rax,-8(%rbp)
+movq $0,%rax
+movq %rax,-24(%rbp)
 movq $1,%rax
-movq %rax,-16(%rbp)
-.L0: 
+movq %rax,-24(%rbp)
+movq -24(%rbp),%rax
+movq -24(%rbp),%rax
+addq $1,-24(%rbp)
 movq -8(%rbp),%rax
-movq %rax,%rbx
-movq $6,%rax
-xchg %rbx,%rax
-cmpq %rbx,%rax
-movq $0,%rax
-setl %al
-cmpq $0,%rax
-je .L1
-movq -8(%rbp),%rax
-movq %rax,%rbx
-movq $5,%rax
-xchg %rbx,%rax
-cmpq %rax,%rbx
-movq $0,%rax
-sete %al
-cmpq $0,%rax
-je .L2
-movq -16(%rbp),%rax
-movq -16(%rbp),%rax
-addq $1,-16(%rbp)
-.L2: 
-movq -8(%rbp),%rax
-movq -8(%rbp),%rax
-addq $1,-8(%rbp)
-jmp .L0
-.L1: 
-movq -16(%rbp),%rax
 popq %rbp
 ret 

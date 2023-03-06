@@ -32,23 +32,27 @@ impl AsmGenerator {
 
     // Generates the assembly from the abstract syntax tree
     pub fn generate(&mut self, ast: ast::Prog) -> Asm {
+        let parent_scope = self.scope_counter;
         self.scope_counter += 1;
-        // let parent_scope = self.scope_counter;
-        let parent_scope = vec![self.scope_counter];
+        let child_scope = self.scope_counter;
+        self.symbol_table.create_scope(child_scope, parent_scope);
         match ast {
             // parses the program header
             ast::Prog::Prog(function_declaration) => {
-                self.gen_function(function_declaration, parent_scope)
+                self.gen_function(function_declaration, child_scope)
             }
         }
     }
 
-    fn gen_function(&mut self, function_declaration: ast::FuncDecl, parent_scope: Vec<u64>) -> Asm {
+    fn gen_function(&mut self, function_declaration: ast::FuncDecl, parent_scope: u64) -> Asm {
         match function_declaration {
             ast::FuncDecl::Func(indentifier, statements) => {
                 let mut assembly = Asm::default();
+                self.scope_counter += 1;
+                self.symbol_table.create_scope(self.scope_counter, parent_scope);
+                let child_scope = self.scope_counter;
                 for statement in statements {
-                    assembly.add_instructions(self.gen_block_item(statement, parent_scope.clone()));
+                    assembly.add_instructions(self.gen_block_item(statement, child_scope));
                 }
                 // TODO: this might not work with conditionals, as the last statement is like
                 // ".L{\w}"
@@ -81,7 +85,7 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_block_item(&mut self, block_item: ast::BlockItem, parent_scope: Vec<u64>) -> Asm {
+    fn gen_block_item(&mut self, block_item: ast::BlockItem, parent_scope: u64) -> Asm {
         match block_item {
             ast::BlockItem::Statement(statement) => self.gen_statement(statement, parent_scope),
             ast::BlockItem::Declaration(declaration) => {
@@ -90,11 +94,11 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_declaration(&mut self, declaration: ast::Declaration, parent_scope: Vec<u64>) -> Asm {
+    fn gen_declaration(&mut self, declaration: ast::Declaration, parent_scope: u64) -> Asm {
         match declaration {
             ast::Declaration::Declare(name, optional_expression, optional_child_declaration) => {
                 let mut decleration_assembly = if let Some(expression) = optional_expression {
-                    let location = self.symbol_table.allocate(name, &parent_scope, LONG_SIZE);
+                    let location = self.symbol_table.allocate(name, parent_scope, LONG_SIZE);
                     let constructed_assembly = Asm::new(
                         self.gen_expression(expression, parent_scope.clone()),
                         vec![
@@ -121,7 +125,7 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_while_loop(&mut self, expression: ast::Expression, statement: Box<ast::Statement>, parent_scope: Vec<u64>) -> Asm {
+    fn gen_while_loop(&mut self, expression: ast::Expression, statement: Box<ast::Statement>, parent_scope: u64) -> Asm {
         // .startofwhile:
         // gen_expr
         // cmpq $0,%rax
@@ -150,7 +154,7 @@ impl AsmGenerator {
         asm
     }
 
-    fn gen_statement(&mut self, statement: ast::Statement, parent_scope: Vec<u64>) -> Asm {
+    fn gen_statement(&mut self, statement: ast::Statement, parent_scope: u64) -> Asm {
         match statement {
             ast::Statement::ForDecl(_, _, _, _) => todo!(),
             ast::Statement::Continue => todo!(),
@@ -225,18 +229,19 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_block(&mut self, block: Vec<ast::BlockItem>, mut parent_scope: Vec<u64>) -> Asm {
+    fn gen_block(&mut self, block: Vec<ast::BlockItem>, parent_scope: u64) -> Asm {
         let mut asm = Asm::default();
         self.scope_counter += 1;
-        parent_scope.push(self.scope_counter);
+        self.symbol_table.create_scope(self.scope_counter, parent_scope);
+        let child_scope = self.scope_counter;
         // let parent_scope = self.scope_counter;
         for block_item in block {
-            asm.add_instructions(self.gen_block_item(block_item, parent_scope.clone()));
+            asm.add_instructions(self.gen_block_item(block_item, child_scope));
         }
         asm
     }
 
-    fn gen_expression(&mut self, expr: ast::Expression, parent_scope: Vec<u64>) -> Asm {
+    fn gen_expression(&mut self, expr: ast::Expression, parent_scope: u64) -> Asm {
         match expr {
             ast::Expression::NullExp => Asm::default(),
             ast::Expression::Constant(int) => {
@@ -258,7 +263,7 @@ impl AsmGenerator {
                 ),
             ast::Expression::Assign(name, expression) => {
                 let asm = self.gen_expression(*expression, parent_scope.clone());
-                let optional_location = self.symbol_table.get(&name, &parent_scope);
+                let optional_location = self.symbol_table.get(&name, parent_scope);
                 if let Some(location) = optional_location {
                     Asm::new(
                         asm,
@@ -272,12 +277,12 @@ impl AsmGenerator {
                     fail!(
                         "exp(assign)\nVariable \"{}\" in scope '{} referenced but not declared",
                         name,
-                        *parent_scope.last().expect("Vector should never be empty")
+                        parent_scope
                     );
                 }
             }
             ast::Expression::ReferenceVariable(name) => {
-                let optional_location = self.symbol_table.get(&name, &parent_scope);
+                let optional_location = self.symbol_table.get(&name, parent_scope);
                 if let Some(location) = optional_location {
                     // Asm::instruction("pushq".into(), location.clone())
                     Asm::instruction("movq".into(), format!("{location},%rax"))
@@ -285,7 +290,7 @@ impl AsmGenerator {
                     fail!(
                         "Variable \"{}\" in scope '{} referenced but not declared",
                         name,
-                        *parent_scope.last().expect("Vector should never be empty")
+                        parent_scope
                     );
                 }
             }
@@ -312,7 +317,7 @@ impl AsmGenerator {
         binary_operator: BinaryOperator,
         left_expr: Box<Expression>,
         right_expr: Box<Expression>,
-        parent_scope: Vec<u64>,
+        parent_scope: u64,
     ) -> Asm {
         let mut left_exp = self.gen_expression(*left_expr, parent_scope.clone());
         // Left expression is in %rbx, right will be in %rax
@@ -452,7 +457,7 @@ impl AsmGenerator {
         left_exp
     }
 
-    fn operation(&self, operator: ast::UnaryOperator, parent_scope: Vec<u64>) -> Asm {
+    fn operation(&self, operator: ast::UnaryOperator, parent_scope: u64) -> Asm {
         // Note the following might be a bit of a premature optimization. For all the cases,
         // instead of pushing/popping the values off the stack into the ecx register, I instead
         // copy them into a register then operate on them, then write to a register, minimizing
@@ -470,10 +475,10 @@ impl AsmGenerator {
                 AsmInstr::from("sete", "%al"),
             ]),
             ast::UnaryOperator::PostfixIncrement(name) => {
-                let location = self.symbol_table.get(&name, &parent_scope).expect(&format!(
+                let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
                     name,
-                    *parent_scope.last().expect("Vector should never be empty")
+                    parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("movq".into(), format!("{location},%rax")),
@@ -481,10 +486,10 @@ impl AsmGenerator {
                 ])
             }
             ast::UnaryOperator::PrefixIncrement(name) => {
-                let location = self.symbol_table.get(&name, &parent_scope).expect(&format!(
+                let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
                     name,
-                    *parent_scope.last().expect("Vector should never be empty")
+                    parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("addq".into(), format!("$1,{location}")),
@@ -492,10 +497,10 @@ impl AsmGenerator {
                 ])
             }
             ast::UnaryOperator::PrefixDecrement(name) => {
-                let location = self.symbol_table.get(&name, &parent_scope).expect(&format!(
+                let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
                     name,
-                    *parent_scope.last().expect("Vector should never be empty")
+                    parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("subq".into(), format!("$1,{location}")),
@@ -503,10 +508,10 @@ impl AsmGenerator {
                 ])
             }
             ast::UnaryOperator::PostfixDecrement(name) => {
-                let location = self.symbol_table.get(&name, &parent_scope).expect(&format!(
+                let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
                     name,
-                    *parent_scope.last().expect("Vector should never be empty")
+                    parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("movq".into(), format!("{location},%rax")),
