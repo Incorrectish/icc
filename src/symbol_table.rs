@@ -86,12 +86,14 @@ impl SymbolTable {
         //     .expect("This vector should never be empty");
         // dbg!(parent_scopes);
         // dbg!(curr_scope);
+        dbg!("hi");
         let new_location = self.gen_location(size, curr_scope);
         if self.symbol_table.contains_key(&(name.clone(), curr_scope)) {
             fail!("Variable {name} already defined in scope '{curr_scope}");
         } else {
             self.symbol_table
                 .insert((name, curr_scope), new_location.clone());
+            println!("symbol table is {:?}", self.symbol_table);
             let mut mem_loc_alloc = self.newest_mem_locations_and_allocation_sizes_by_scope[&curr_scope];
             mem_loc_alloc.0 += size;
             mem_loc_alloc.1 += size;
@@ -116,7 +118,18 @@ impl SymbolTable {
             }
             parent = *self.parents.get(&curr_scope).expect("Scope not properly added with create scope, smh :(");
         }
+        self.debug_scopes(scope);
+        println!("{:?}", self.symbol_table);
         None
+    }
+
+    pub fn debug_scopes(&self, scope: u64) {
+        let mut parent = Some(scope);
+        while let Some(curr_scope) = parent {
+            print!("'{curr_scope}, ");
+            parent = self.parents[&curr_scope];
+        }
+        println!("All the scopes folks");
     }
 
     pub fn gen_location(&mut self, allocation: u64, scope: u64) -> String {

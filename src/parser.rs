@@ -240,13 +240,13 @@ impl Parser {
         } else {
             let exp1 = self.parse_expression();
             let token = self.lexer.next();
-            if !matches!(token, Some(Token::CloseParen)) {
+            if !matches!(token, Some(Token::Semicolon)) {
                 fail!("Expected semicolon, got {token:?}")
             }
             let expression = self.parse_expression();
             let token = self.lexer.next();
-            if !matches!(token, Some(Token::CloseParen)) {
-                fail!("Expected closing parentheses, got {token:?}")
+            if !matches!(token, Some(Token::Semicolon)) {
+                fail!("Expected semicolon, got {token:?}")
             }
             let token = self.lexer.peek();
             if let Some(Token::CloseParen) = token {

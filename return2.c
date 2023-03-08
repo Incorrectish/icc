@@ -1,14 +1,5 @@
 int main() {
-    int i = 0;
-    {
-        {
-            i += 9;
-            int i = 0;
-        }
-    }
-    {
-        int i = 1;
-        i++;
-    }
-    return i;
+    int a;
+    for(a = 0; a < 10; a++);
+    return a;
 }

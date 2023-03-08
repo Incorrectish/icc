@@ -33,9 +33,7 @@ impl AsmGenerator {
     // Generates the assembly from the abstract syntax tree
     pub fn generate(&mut self, ast: ast::Prog) -> Asm {
         let parent_scope = self.scope_counter;
-        self.scope_counter += 1;
-        let child_scope = self.scope_counter;
-        self.symbol_table.create_scope(child_scope, parent_scope);
+        let child_scope = self.create_scope(parent_scope);
         match ast {
             // parses the program header
             ast::Prog::Prog(function_declaration) => {
@@ -48,8 +46,7 @@ impl AsmGenerator {
         match function_declaration {
             ast::FuncDecl::Func(indentifier, statements) => {
                 let mut assembly = Asm::default();
-                self.scope_counter += 1;
-                self.symbol_table.create_scope(self.scope_counter, parent_scope);
+                let _ = self.create_scope(parent_scope);
                 let child_scope = self.scope_counter;
                 for statement in statements {
                     assembly.add_instructions(self.gen_block_item(statement, child_scope));
@@ -67,7 +64,7 @@ impl AsmGenerator {
                     }
                 }
                 // todo!()
-                // TODO: branch analysis is ass on this
+                // TODO: branch analysis is bad on this
                 // if assembly.last().command() != "ret" {
                 //     assembly.append_instruction("xorq".into(), "%rax,%rax".into());
                 //     assembly.append_instruction("ret".into(), String::new());
@@ -100,7 +97,7 @@ impl AsmGenerator {
                 let mut decleration_assembly = if let Some(expression) = optional_expression {
                     let location = self.symbol_table.allocate(name, parent_scope, LONG_SIZE);
                     let constructed_assembly = Asm::new(
-                        self.gen_expression(expression, parent_scope.clone()),
+                        self.gen_expression(expression, parent_scope),
                         vec![
                             // AsmInstr::from("popq", "%rax"),
                             AsmInstr::new("movq".into(), format!("%rax,{location}")),
@@ -114,6 +111,7 @@ impl AsmGenerator {
                     // have whatever memory is already in the adress, like C stadard
                     // let asm = Asm::instruction("movq".into(), format!("$0, {location}"));
                     //asm
+                    let _location = self.symbol_table.allocate(name, parent_scope, LONG_SIZE);
                     Asm::default()
                 };
                 if let Some(child_declaration) = *optional_child_declaration {
@@ -125,7 +123,43 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_while_loop(&mut self, expression: ast::Expression, statement: Box<ast::Statement>, parent_scope: u64) -> Asm {
+    fn gen_do_loop(
+        &mut self,
+        expression: ast::Expression,
+        statement: Box<ast::Statement>,
+        parent_scope: u64,
+    ) -> Asm {
+        // .startofdo:
+        // gen_stmt
+        // gen_expr
+        // cmpq $0,%rax
+        // je .endofwhile
+        // jmp .startofwhile
+        // .endofwhile:
+        // let expression = dbg!(expression);
+        let (start_of_while_name, start_of_while_label) = self.gen_new_label();
+        let (end_of_while_name, end_of_while_label) = self.gen_new_label();
+        let mut asm = Asm::instruction(start_of_while_label, String::new());
+        let stmt = self.gen_statement(*statement, parent_scope);
+        stmt.print();
+        asm.add_instructions(stmt);
+        let exp = self.gen_expression(expression, parent_scope);
+        asm.add_instructions(exp);
+        asm.append_instruction("cmpq".to_string(), "$0,%rax".to_string());
+        // asm.append_instruction("xorq".to_string(), "%rax,%rax".to_string());
+        // asm.append_instruction("sete".to_string(), "%al".to_string());
+        asm.append_instruction("je".to_string(), end_of_while_name);
+        asm.append_instruction("jmp".to_string(), start_of_while_name);
+        asm.append_instruction(end_of_while_label, String::new());
+        asm
+    }
+
+    fn gen_while_loop(
+        &mut self,
+        expression: ast::Expression,
+        statement: Box<ast::Statement>,
+        parent_scope: u64,
+    ) -> Asm {
         // .startofwhile:
         // gen_expr
         // cmpq $0,%rax
@@ -134,12 +168,10 @@ impl AsmGenerator {
         // jmp .startofwhile
         // .endofwhile:
         // let expression = dbg!(expression);
-        let start_of_while_name = self.gen_new_label();
-        let start_of_while_label = format!("{start_of_while_name}:");
-        let end_of_while_name = self.gen_new_label();
-        let end_of_while_label = format!("{end_of_while_name}:");
+        let (start_of_while_name, start_of_while_label) = self.gen_new_label();
+        let (end_of_while_name, end_of_while_label) = self.gen_new_label();
         let mut asm = Asm::instruction(start_of_while_label, String::new());
-        let exp = self.gen_expression(expression, parent_scope.clone());
+        let exp = self.gen_expression(expression, parent_scope);
         asm.add_instructions(exp);
         asm.append_instruction("cmpq".to_string(), "$0,%rax".to_string());
         // asm.append_instruction("xorq".to_string(), "%rax,%rax".to_string());
@@ -156,14 +188,34 @@ impl AsmGenerator {
 
     fn gen_statement(&mut self, statement: ast::Statement, parent_scope: u64) -> Asm {
         match statement {
-            ast::Statement::ForDecl(_, _, _, _) => todo!(),
             ast::Statement::Continue => todo!(),
             ast::Statement::Break => todo!(),
             ast::Statement::While(expression, statement) => {
                 self.gen_while_loop(expression, statement, parent_scope)
             }
-            ast::Statement::Do(statement, expression) => todo!(),
-            ast::Statement::For(_, _, _, _) => todo!(),
+            ast::Statement::Do(statement, expression) => {
+                self.gen_do_loop(expression, statement, parent_scope)
+            }
+            ast::Statement::ForDecl(decl, exp1, exp2, body) => {
+                let child_scope = self.create_scope(parent_scope);
+                let mut asm = self.gen_declaration(decl, child_scope);
+                let (begin_for_name, begin_for_label) = self.gen_new_label();
+                asm.append_instruction(begin_for_label, String::new());
+                asm.add_instructions(self.gen_for_loop(exp1, exp2, body, child_scope, begin_for_name));
+                asm
+            }
+            ast::Statement::For(optional_exp, exp1, exp2, body) => {
+                // same as for decl generally, except the very first part
+                let (begin_for_name, begin_for_label) = self.gen_new_label();
+                let mut asm: Asm = if let Some(exp) = optional_exp {
+                    self.gen_expression(exp, parent_scope)
+                } else {
+                    Asm::default()
+                };
+                asm.append_instruction(begin_for_label, String::new());
+                asm.add_instructions(self.gen_for_loop(exp1, exp2, body, parent_scope, begin_for_name));
+                asm
+            }
             ast::Statement::Return(expression) => {
                 let constructed_assembly = Asm::new(
                     self.gen_expression(expression, parent_scope),
@@ -184,21 +236,19 @@ impl AsmGenerator {
                 self.gen_expression(expression, parent_scope)
             }
             ast::Statement::Conditional(expression, if_children, potential_else_children) => {
-                let mut asm = self.gen_expression(expression, parent_scope.clone());
-                let else_ = self.gen_new_label();
-                let else_label = format!("{else_}:");
+                let mut asm = self.gen_expression(expression, parent_scope);
+                let (else_, else_label) = self.gen_new_label();
                 asm.add_instructions(Asm::instructions(vec![
                     // AsmInstr::from("popq", "%rax"),
                     AsmInstr::from("cmpq", "$0,%rax"),
                     AsmInstr::new("je".into(), else_.clone()),
                 ]));
                 // for statement in if_children {
-                asm.add_instructions(self.gen_statement(*if_children, parent_scope.clone()));
+                asm.add_instructions(self.gen_statement(*if_children, parent_scope));
                 // }
                 if let Some(else_children) = *potential_else_children {
                     // TODO: get labels, else, and endofif
-                    let endif_ = self.gen_new_label();
-                    let endif_label = format!("{endif_}:");
+                    let (endif_, endif_label) = self.gen_new_label();
                     asm.add_instructions(Asm::instructions(vec![
                         AsmInstr::new("jmp".into(), endif_),
                         AsmInstr::new(else_label, String::new()),
@@ -225,14 +275,75 @@ impl AsmGenerator {
                 // if else.is_none
                 // end_of_if
             }
-            ast::Statement::Block(block) => self.gen_block(block, parent_scope.clone()),
+            ast::Statement::Block(block) => self.gen_block(block, parent_scope),
         }
+    }
+
+    // creates a new scope that is a child of the parent scope and returns it
+    fn create_scope(&mut self, parent_scope: u64) -> u64 {
+        self.scope_counter += 1;
+        self.symbol_table
+            .create_scope(self.scope_counter, parent_scope);
+        let child_scope = self.scope_counter;
+        child_scope
+    }
+
+    fn gen_for_loop(
+        &mut self,
+        exp: Expression,
+        optional_exp: Option<Expression>,
+        body: Box<ast::Statement>,
+        parent_scope: u64,
+        begin_for_name: String,
+    ) -> Asm {
+        let mut asm = Asm::default();
+        let (end_for_name, end_for_label) = self.gen_new_label();
+        if !matches!(exp, Expression::NullExp) {
+            asm.add_instructions(self.gen_expression(exp, parent_scope));
+            asm.append_instruction("cmpq".to_string(), "$0, %rax".to_string());
+            asm.append_instruction("je".to_string(), end_for_name);
+        }
+        if let Some(expr) = optional_exp {
+            asm.add_instructions(self.gen_expression(expr, parent_scope));
+        }
+        asm.add_instructions(self.gen_statement(*body, parent_scope));
+        asm.append_instruction("jmp".to_string(), begin_for_name);
+        asm.append_instruction(end_for_label, String::new());
+        asm
+        /*
+         * create_new_scope
+         * gen_declaration
+         * label_begin_for
+         * create_new_scope
+         * if !expression == nullexpression:
+         *  gen_expression1
+         * cmpq $0, %rax
+         * je endoffor
+         * gen_expression
+         * if exp1.is_some()
+         * gen exp2
+         * gen_body
+         * jmp beginfor
+         * endoffor:
+         * {
+         *  declaration
+         *  begin_for
+         *  {
+         *      if !statement 1 {
+         *          goto end of for
+         *      }
+         *      statement2;
+         *      body
+         *      goto begin_for
+         *  }
+         * }
+         * end of for:
+         */
     }
 
     fn gen_block(&mut self, block: Vec<ast::BlockItem>, parent_scope: u64) -> Asm {
         let mut asm = Asm::default();
-        self.scope_counter += 1;
-        self.symbol_table.create_scope(self.scope_counter, parent_scope);
+        let _ = self.create_scope(parent_scope);
         let child_scope = self.scope_counter;
         // let parent_scope = self.scope_counter;
         for block_item in block {
@@ -249,8 +360,8 @@ impl AsmGenerator {
             }
             ast::Expression::UnaryOp(operator, expression) => match operator {
                 _ => {
-                    let mut asm = self.gen_expression(*expression, parent_scope.clone());
-                    asm.add_instructions(self.operation(operator, parent_scope.clone()));
+                    let mut asm = self.gen_expression(*expression, parent_scope);
+                    asm.add_instructions(self.operation(operator, parent_scope));
                     asm
                 }
             },
@@ -262,7 +373,7 @@ impl AsmGenerator {
                     parent_scope,
                 ),
             ast::Expression::Assign(name, expression) => {
-                let asm = self.gen_expression(*expression, parent_scope.clone());
+                let asm = self.gen_expression(*expression, parent_scope);
                 let optional_location = self.symbol_table.get(&name, parent_scope);
                 if let Some(location) = optional_location {
                     Asm::new(
@@ -295,14 +406,12 @@ impl AsmGenerator {
                 }
             }
             ast::Expression::Ternary(expression1, expression2, expression3) => {
-                let else_name = self.gen_new_label();
-                let else_label = format!("{else_name}:");
-                let endternary_name = self.gen_new_label();
-                let endternary_label = format!("{endternary_name}:");
-                let mut asm = self.gen_expression(*expression1, parent_scope.clone());
+                let (else_name, else_label) = self.gen_new_label();
+                let (endternary_name, endternary_label) = self.gen_new_label();
+                let mut asm = self.gen_expression(*expression1, parent_scope);
                 asm.append_instruction("cmpq".into(), "$0,%rax".into());
                 asm.append_instruction("je".into(), else_name);
-                asm.add_instructions(self.gen_expression(*expression2, parent_scope.clone()));
+                asm.add_instructions(self.gen_expression(*expression2, parent_scope));
                 asm.append_instruction("jmp".into(), endternary_name);
                 asm.append_instruction(else_label, String::new());
                 asm.add_instructions(self.gen_expression(*expression3, parent_scope));
@@ -319,7 +428,7 @@ impl AsmGenerator {
         right_expr: Box<Expression>,
         parent_scope: u64,
     ) -> Asm {
-        let mut left_exp = self.gen_expression(*left_expr, parent_scope.clone());
+        let mut left_exp = self.gen_expression(*left_expr, parent_scope);
         // Left expression is in %rbx, right will be in %rax
         left_exp.append_instruction("movq".into(), "%rax,%rbx".into());
         let right_exp = self.gen_expression(*right_expr, parent_scope);
@@ -390,12 +499,9 @@ impl AsmGenerator {
             BinaryOperator::LogicalOr => {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
                 left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
-                let label1_name = self.gen_new_label();
-                let label1 = format!("{label1_name}:");
-                let label2_name = self.gen_new_label();
-                let label2 = format!("{label2_name}:");
-                let label3_name = self.gen_new_label();
-                let label3 = format!("{label3_name}:");
+                let (label1_name, label1) = self.gen_new_label();
+                let (label2_name, label2) = self.gen_new_label();
+                let (label3_name, label3) = self.gen_new_label();
                 left_exp.append_instruction("jne".into(), label1_name);
                 left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
                 left_exp.append_instruction("je".into(), label2_name);
@@ -409,10 +515,8 @@ impl AsmGenerator {
             BinaryOperator::LogicalAnd => {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
                 left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
-                let label1_name = self.gen_new_label();
-                let label1 = format!("{label1_name}:");
-                let label2_name = self.gen_new_label();
-                let label2 = format!("{label2_name}:");
+                let (label1_name, label1) = self.gen_new_label();
+                let (label2_name, label2) = self.gen_new_label();
                 left_exp.append_instruction("je".into(), label1_name.clone());
                 left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
                 left_exp.append_instruction("je".into(), label1_name);
@@ -477,8 +581,7 @@ impl AsmGenerator {
             ast::UnaryOperator::PostfixIncrement(name) => {
                 let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
-                    name,
-                    parent_scope
+                    name, parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("movq".into(), format!("{location},%rax")),
@@ -488,8 +591,7 @@ impl AsmGenerator {
             ast::UnaryOperator::PrefixIncrement(name) => {
                 let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
-                    name,
-                    parent_scope
+                    name, parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("addq".into(), format!("$1,{location}")),
@@ -499,8 +601,7 @@ impl AsmGenerator {
             ast::UnaryOperator::PrefixDecrement(name) => {
                 let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
-                    name,
-                    parent_scope
+                    name, parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("subq".into(), format!("$1,{location}")),
@@ -510,8 +611,7 @@ impl AsmGenerator {
             ast::UnaryOperator::PostfixDecrement(name) => {
                 let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
                     "Variable {} in scope '{} accessed but not declared",
-                    name,
-                    parent_scope
+                    name, parent_scope
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("movq".into(), format!("{location},%rax")),
@@ -551,9 +651,11 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_new_label(&mut self) -> String {
+    // Returns (name, label), for example it could return (".L1", ".L1:") 
+    fn gen_new_label(&mut self) -> (String, String) {
         let label = format!(".L{}", self.jump_counter);
+        let name = format!("{label}:");
         self.jump_counter += 1;
-        label
+        (label, name)
     }
 }
