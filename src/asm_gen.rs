@@ -106,6 +106,7 @@ impl AsmGenerator {
                         vec![
                             // AsmInstr::from("popq", "%rax"),
                             AsmInstr::new("movq".into(), format!("%rax,{location}")),
+                            AsmInstr::new("subq".into(), format!("${LONG_SIZE},%rsp")),
                         ],
                     );
                     constructed_assembly
