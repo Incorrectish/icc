@@ -84,24 +84,27 @@ pub enum BlockItem {
 
 #[derive(Debug)]
 pub enum FuncDecl {
-    Func(String, Vec<BlockItem>),
+    Func(String, Vec<String>, Vec<BlockItem>),
 }
 
 #[derive(Debug)]
 pub enum Prog {
-    Prog(FuncDecl),
+    Prog(Vec<FuncDecl>),
 }
 
 impl Prog {
     pub fn print(&self) {
         match self {
-            Prog::Prog(ref func) => {
+            Prog::Prog(ref funcs) => {
                 let mut current_scope = 0;
                 let immut_curr_scope = current_scope;
                 println!("'{current_scope}: Program: ");
                 current_scope += 1;
                 let curr_clone = current_scope;
-                func.print(1, &mut current_scope, curr_clone);
+                for func in funcs {
+                    func.print(1, &mut current_scope, curr_clone);
+                    println!();
+                }
                 println!("'{immut_curr_scope}: EndProgram");
             }
         }
@@ -112,8 +115,8 @@ impl FuncDecl {
     pub fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         let indentation = INDENT.repeat(depth);
         match self {
-            FuncDecl::Func(ref indentifier, ref block_items) => {
-                println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: ()\n{indentation}'{parent_scope}: begin:");
+            FuncDecl::Func(ref indentifier, ref arguments, ref block_items) => {
+                println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: {arguments:?}\n{indentation}'{parent_scope}: begin:");
                 *scope += 1;
                 let curr_scope = *scope;
                 for block_item in block_items {

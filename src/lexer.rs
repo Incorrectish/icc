@@ -7,20 +7,72 @@ use std::mem;
 // The struct simply transforms an input file into a token stream
 #[derive(Debug, Clone)]
 pub struct Lexer {
-    pos: usize,
+    prev_prev_pos: usize,
+    prev_pos: usize,
+    curr_pos: usize,
+    prev_prev_line_number: usize,
+    prev_line_number: usize,
     line_number: usize,
     input: String,
+    file_name: String,
     curr_substr: String,
     curr_token: Option<Token>,
     prev_token: Option<Token>,
 }
 
 impl Lexer {
-    pub fn new(input: String) -> Self {
+    pub fn line_number(&self) -> usize {
+        self.line_number
+    }
+
+    pub fn print_line_with_caret(&self) {
+        // Find the start and end positions of the line that contains the given position
+        // TODO make sure this works
+        /*
+         * something like this
+         * error: expected `;`, found keyword `let`
+        --> src/main.rs:9:13
+           |
+        9  |    let x = 5
+           |             ^ help: add `;` here
+        ...
+        19 |     let i = 7;
+           |     --- unexpected token
+         */
+        let long_string = &self.input;
+        let pos = self.prev_prev_pos;
+        let line_number = self.prev_prev_line_number + 1;
+        let start_pos = long_string[..pos].rfind('\n').map_or(0, |i| i + 1);
+        let end_pos = long_string[pos..]
+            .find('\n')
+            .map_or(long_string.len(), |i| i + pos);
+
+        // Extract the line and the substring that corresponds to the caret (^)
+        let line = &long_string[start_pos..end_pos];
+        let line_number_width = line_number.to_string().len();
+        let caret_str = " ".repeat(pos - start_pos) + "^";
+        let line_num_spaces = " ".repeat(line_number_width);
+        let pos_on_line = pos - start_pos;
+        // Print the line with the caret (^) underneath the given position
+        println!("{} --> {}:{}", self.file_name, line_number, pos_on_line);
+        println!("{line_num_spaces} | ");
+        println!("{line_number} | {line}");
+        println!("{line_num_spaces} | {caret_str}");
+        // println!("...");
+        // println!("{} | ", self.prev_line_number + 1);
+        // println!()
+    }
+
+    pub fn new(input: String, file_name: String) -> Self {
         let mut lexer = Self {
-            pos: 0,
+            prev_prev_pos: 0,
+            prev_pos: 0,
+            curr_pos: 0,
+            prev_prev_line_number: 0,
+            prev_line_number: 0,
             line_number: 0,
             input,
+            file_name,
             curr_substr: String::new(),
             curr_token: None,
             prev_token: None,
@@ -56,12 +108,16 @@ impl Lexer {
 
     // This gets the next token
     fn next_token(&mut self) -> Option<Token> {
-        if self.pos >= self.input.len() {
+        if self.curr_pos >= self.input.len() {
             return None;
         }
-        let curr_char = self.input.as_bytes()[self.pos] as char;
-        self.pos += 1;
-        let next_char = self.input.as_bytes().get(self.pos);
+        self.prev_prev_line_number = self.prev_line_number;
+        self.prev_line_number = self.line_number;
+        self.prev_prev_pos = self.prev_pos;
+        self.prev_pos = self.curr_pos;
+        let curr_char = self.input.as_bytes()[self.curr_pos] as char;
+        self.curr_pos += 1;
+        let next_char = self.input.as_bytes().get(self.curr_pos);
         match curr_char {
             '{' => Some(Token::OpenBrace),
             '}' => Some(Token::CloseBrace),
@@ -74,24 +130,26 @@ impl Lexer {
             '?' => Some(Token::Question),
             '-' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::MinusAssign)
                 } else if next_char == Some(&('-' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     match self.prev_token {
                         Some(Token::Identifier(ref name)) => {
                             Some(Token::PostfixDecrement(name.clone()))
                         }
                         _ => {
-                            let cached_pos = self.pos;
-                            let cached_prev_token = self.prev_token.take();
-                            let cached_curr_token = self.curr_token.take();
-                            let cached_substr = std::mem::take(&mut self.curr_substr);
+                            // let cached_pos = self.curr_pos;
+                            // let cached_prev_token = self.prev_token.take();
+                            // let cached_curr_token = self.curr_token.take();
+                            // let cached_substr = std::mem::take(&mut self.curr_substr);
+                            let lex = self.clone();
                             let next_token = self.next_token();
-                            self.pos = cached_pos;
-                            self.prev_token = cached_prev_token;
-                            self.curr_token = cached_curr_token;
-                            self.curr_substr = cached_substr;
+                            *self = lex;
+                            // self.curr_pos = cached_pos;
+                            // self.prev_token = cached_prev_token;
+                            // self.curr_token = cached_curr_token;
+                            // self.curr_substr = cached_substr;
                             match next_token {
                                 Some(Token::Identifier(name)) => Some(Token::PrefixDecrement(name)),
                                 Some(Token::IntegerLiteral(int)) => {
@@ -109,7 +167,7 @@ impl Lexer {
             }
             '%' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::ModAssign)
                 } else {
                     Some(Token::Modulo)
@@ -117,24 +175,26 @@ impl Lexer {
             }
             '+' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::AddAssign)
                 } else if next_char == Some(&('+' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     match self.prev_token {
                         Some(Token::Identifier(ref name)) => {
                             Some(Token::PostfixIncrement(name.clone()))
                         }
                         _ => {
-                            let cached_pos = self.pos;
-                            let cached_prev_token = self.prev_token.take();
-                            let cached_curr_token = self.curr_token.take();
-                            let cached_substr = std::mem::take(&mut self.curr_substr);
+                            // let cached_pos = self.curr_pos;
+                            // let cached_prev_token = self.prev_token.take();
+                            // let cached_curr_token = self.curr_token.take();
+                            // let cached_substr = std::mem::take(&mut self.curr_substr);
+                            let lex = self.clone();
                             let next_token = self.next_token();
-                            self.pos = cached_pos;
-                            self.prev_token = cached_prev_token;
-                            self.curr_token = cached_curr_token;
-                            self.curr_substr = cached_substr;
+                            *self = lex;
+                            // self.curr_pos = cached_pos;
+                            // self.prev_token = cached_prev_token;
+                            // self.curr_token = cached_curr_token;
+                            // self.curr_substr = cached_substr;
                             match next_token {
                                 Some(Token::Identifier(name)) => Some(Token::PrefixIncrement(name)),
                                 Some(Token::IntegerLiteral(int)) => {
@@ -152,7 +212,7 @@ impl Lexer {
             }
             '*' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::MulAssign)
                 } else {
                     Some(Token::Multiply)
@@ -160,7 +220,7 @@ impl Lexer {
             }
             '/' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::DivAssign)
                 } else {
                     Some(Token::Divide)
@@ -168,7 +228,7 @@ impl Lexer {
             }
             '^' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::XorAssign)
                 } else {
                     Some(Token::Xor)
@@ -176,7 +236,7 @@ impl Lexer {
             }
             '!' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::NotEqual)
                 } else {
                     Some(Token::LogicalNot)
@@ -184,10 +244,10 @@ impl Lexer {
             }
             '&' => {
                 if next_char == Some(&('&' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::LogicalAnd)
                 } else if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::BitwiseAndAssign)
                 } else {
                     Some(Token::BitwiseAnd)
@@ -195,10 +255,10 @@ impl Lexer {
             }
             '|' => {
                 if next_char == Some(&('|' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::LogicalOr)
                 } else if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::BitwiseOrAssign)
                 } else {
                     Some(Token::BitwiseOr)
@@ -206,13 +266,13 @@ impl Lexer {
             }
             '>' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::GreaterThanOrEqualTo)
                 } else if next_char == Some(&('>' as u8)) {
-                    self.pos += 1;
-                    let third_char = self.input.as_bytes().get(self.pos);
+                    self.curr_pos += 1;
+                    let third_char = self.input.as_bytes().get(self.curr_pos);
                     if third_char == Some(&('=' as u8)) {
-                        self.pos += 1;
+                        self.curr_pos += 1;
                         Some(Token::BitwiseRightShiftAssign)
                     } else {
                         Some(Token::BitwiseRightShift)
@@ -223,13 +283,13 @@ impl Lexer {
             }
             '<' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::LessThanOrEqualTo)
                 } else if next_char == Some(&('<' as u8)) {
-                    self.pos += 1;
-                    let third_char = self.input.as_bytes().get(self.pos);
+                    self.curr_pos += 1;
+                    let third_char = self.input.as_bytes().get(self.curr_pos);
                     if third_char == Some(&('=' as u8)) {
-                        self.pos += 1;
+                        self.curr_pos += 1;
                         Some(Token::BitwiseLeftShiftAssign)
                     } else {
                         Some(Token::BitwiseLeftShift)
@@ -240,7 +300,7 @@ impl Lexer {
             }
             '=' => {
                 if next_char == Some(&('=' as u8)) {
-                    self.pos += 1;
+                    self.curr_pos += 1;
                     Some(Token::EqualTo)
                 } else {
                     Some(Token::Assign)
@@ -262,15 +322,15 @@ impl Lexer {
     // current substring
     fn consume_until_next_token(&mut self) {
         loop {
-            if self.pos >= self.input.len() {
+            if self.curr_pos >= self.input.len() {
                 break;
             }
-            let curr_char = self.input.as_bytes()[self.pos] as char;
+            let curr_char = self.input.as_bytes()[self.curr_pos] as char;
             if curr_char.is_whitespace() || Self::is_token(curr_char) {
                 break;
             }
             self.curr_substr.push(curr_char);
-            self.pos += 1;
+            self.curr_pos += 1;
         }
     }
 
@@ -308,26 +368,28 @@ impl Lexer {
 
     // Moves position from `pos` to the next non whitespace character
     fn skip_whitespace(&mut self) {
-        while self.pos < self.input.len()
-            && (self.input.as_bytes()[self.pos] as char).is_whitespace()
+        while self.curr_pos < self.input.len()
+            && (self.input.as_bytes()[self.curr_pos] as char).is_whitespace()
         {
             // TODO: windows compatibility???????
-            if self.input.as_bytes()[self.pos] as char == '\n' {
+            if self.input.as_bytes()[self.curr_pos] as char == '\n' {
                 self.line_number += 1;
             }
-            self.pos += 1;
+            self.curr_pos += 1;
         }
     }
 
     pub fn get_rest_of_input(&self) -> String {
-        self.input.split_at(self.pos).1.into()
+        self.input.split_at(self.curr_pos).1.into()
     }
 
     fn get_line_at_position(s: &str, position: usize) -> Option<&str> {
         // Search backwards from the position to the previous newline character
         let start = s[..position].rfind('\n').map_or(0, |i| i + 1);
         // Search forwards from the position to the next newline character
-        let end = s[position..].find('\n').map_or(s.len(), |i| position + i + 1);
+        let end = s[position..]
+            .find('\n')
+            .map_or(s.len(), |i| position + i + 1);
         if start < end {
             Some(&s[start..end])
         } else {

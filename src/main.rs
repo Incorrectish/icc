@@ -15,7 +15,7 @@ fn main() {
     let filename = env::args().nth(1).expect("Please provide a file to lex");
     // test_lexer(Path::new(&filename));
     test_ast(Path::new(&filename));
-    compile(Path::new(&filename));
+    // compile(Path::new(&filename));
     // test_output(Path::new(&filename));
 }
 
@@ -24,7 +24,11 @@ fn compile(filename: &Path) {
     // This is getting the file name without the extension
 
     // Generating the abstract syntax tree, and the output assembly from it
-    let ast = Parser::new(Lexer::new(file_string)).parse();
+    let ast = Parser::new(Lexer::new(
+        file_string,
+        filename.to_str().unwrap().to_string(),
+    ))
+    .parse();
     let asm = AsmGenerator::new().generate(ast);
 
     let asm_file = filename.with_extension("s");
@@ -45,14 +49,19 @@ fn compile(filename: &Path) {
 fn test_lexer(filename: &Path) {
     let file_string = fs::read_to_string(filename).expect("Couldn't open file");
     println!("{file_string}");
-    dbg!(Lexer::new(file_string).collect::<Vec<_>>());
+    dbg!(Lexer::new(file_string, filename.to_str().unwrap().to_string()).collect::<Vec<_>>());
 }
 
 #[allow(unused)]
 fn test_ast(filename: &Path) {
     let file_string = fs::read_to_string(filename).expect("Couldn't open file");
     // println!("{file_string}");
-    Parser::new(Lexer::new(file_string)).parse().print();
+    Parser::new(Lexer::new(
+        file_string,
+        filename.to_str().unwrap().to_string(),
+    ))
+    .parse()
+    .print();
 }
 
 // fn test_output(filename: &Path) {

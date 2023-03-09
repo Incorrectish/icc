@@ -29,6 +29,10 @@ impl SymbolTable {
         }
     }
 
+    pub fn get_scope_size(&self, scope: u64) -> u64 {
+        self.newest_mem_locations_and_allocation_sizes_by_scope[&scope].1
+    }
+
     #[allow(unused)]
     pub fn print(&self) {
         println!("Symbol Table: ");
@@ -42,12 +46,15 @@ impl SymbolTable {
     }
 
     pub fn create_scope(&mut self, scope: u64, parent: u64) {
-        println!("Creating scope '{scope} with parent '{parent}");
+        // println!("Creating scope '{scope} with parent '{parent}");
         self.parents.insert(scope, Some(parent));
+        let parent_alloc = *self.newest_mem_locations_and_allocation_sizes_by_scope.get(&parent).expect(&format!("scope '{scope} not created"));
         self.newest_mem_locations_and_allocation_sizes_by_scope
             .insert(
                 scope,
-                *self.newest_mem_locations_and_allocation_sizes_by_scope.get(&parent).expect(&format!("scope '{scope} not created")),
+                // keep the top of the stack pointer the same, but the allocation size for the
+                // scope should be 0
+                (parent_alloc.0, 0)
             );
     }
 
@@ -86,14 +93,13 @@ impl SymbolTable {
         //     .expect("This vector should never be empty");
         // dbg!(parent_scopes);
         // dbg!(curr_scope);
-        dbg!("hi");
         let new_location = self.gen_location(size, curr_scope);
         if self.symbol_table.contains_key(&(name.clone(), curr_scope)) {
             fail!("Variable {name} already defined in scope '{curr_scope}");
         } else {
             self.symbol_table
                 .insert((name, curr_scope), new_location.clone());
-            println!("symbol table is {:?}", self.symbol_table);
+            // println!("symbol table is {:?}", self.symbol_table);
             let mut mem_loc_alloc = self.newest_mem_locations_and_allocation_sizes_by_scope[&curr_scope];
             mem_loc_alloc.0 += size;
             mem_loc_alloc.1 += size;
@@ -118,12 +124,13 @@ impl SymbolTable {
             }
             parent = *self.parents.get(&curr_scope).expect("Scope not properly added with create scope, smh :(");
         }
-        self.debug_scopes(scope);
-        println!("{:?}", self.symbol_table);
+        // self.debug_scope(scope);
+        // println!("{:?}", self.symbol_table);
         None
     }
 
-    pub fn debug_scopes(&self, scope: u64) {
+    #[allow(unused)]
+    pub fn debug_scope(&self, scope: u64) {
         let mut parent = Some(scope);
         while let Some(curr_scope) = parent {
             print!("'{curr_scope}, ");

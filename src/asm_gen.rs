@@ -34,23 +34,28 @@ impl AsmGenerator {
     pub fn generate(&mut self, ast: ast::Prog) -> Asm {
         let parent_scope = self.scope_counter;
         let child_scope = self.create_scope(parent_scope);
+        let mut asm = Asm::default();
         match ast {
             // parses the program header
-            ast::Prog::Prog(function_declaration) => {
-                self.gen_function(function_declaration, child_scope)
+            ast::Prog::Prog(function_declarations) => {
+                for function_declaration in function_declarations {
+                    asm.add_instructions(self.gen_function(function_declaration, child_scope));
+                }
             }
         }
+        self.remove_scope(child_scope);
+        asm
     }
 
     fn gen_function(&mut self, function_declaration: ast::FuncDecl, parent_scope: u64) -> Asm {
         match function_declaration {
-            ast::FuncDecl::Func(indentifier, statements) => {
+            ast::FuncDecl::Func(indentifier, arguments, statements) => {
                 let mut assembly = Asm::default();
-                let _ = self.create_scope(parent_scope);
-                let child_scope = self.scope_counter;
+                let child_scope = self.create_scope(parent_scope);
                 for statement in statements {
                     assembly.add_instructions(self.gen_block_item(statement, child_scope));
                 }
+                assembly.add_instructions(self.remove_scope(child_scope));
                 // TODO: this might not work with conditionals, as the last statement is like
                 // ".L{\w}"
                 // let last = assembly.last();
@@ -94,7 +99,7 @@ impl AsmGenerator {
     fn gen_declaration(&mut self, declaration: ast::Declaration, parent_scope: u64) -> Asm {
         match declaration {
             ast::Declaration::Declare(name, optional_expression, optional_child_declaration) => {
-                let mut decleration_assembly = if let Some(expression) = optional_expression {
+                let mut declaration_assembly = if let Some(expression) = optional_expression {
                     let location = self.symbol_table.allocate(name, parent_scope, LONG_SIZE);
                     let constructed_assembly = Asm::new(
                         self.gen_expression(expression, parent_scope),
@@ -115,10 +120,10 @@ impl AsmGenerator {
                     Asm::default()
                 };
                 if let Some(child_declaration) = *optional_child_declaration {
-                    decleration_assembly
+                    declaration_assembly
                         .add_instructions(self.gen_declaration(child_declaration, parent_scope));
                 }
-                decleration_assembly
+                declaration_assembly
             }
         }
     }
@@ -202,6 +207,7 @@ impl AsmGenerator {
                 let (begin_for_name, begin_for_label) = self.gen_new_label();
                 asm.append_instruction(begin_for_label, String::new());
                 asm.add_instructions(self.gen_for_loop(exp1, exp2, body, child_scope, begin_for_name));
+                asm.add_instructions(self.remove_scope(child_scope));
                 asm
             }
             ast::Statement::For(optional_exp, exp1, exp2, body) => {
@@ -279,6 +285,11 @@ impl AsmGenerator {
         }
     }
 
+    fn remove_scope(&mut self, parent_scope: u64) -> Asm {
+        let scope_size = self.symbol_table.get_scope_size(parent_scope);
+        Asm::instruction("addq".to_string(), format!("${scope_size},%rsp"))
+    }
+
     // creates a new scope that is a child of the parent scope and returns it
     fn create_scope(&mut self, parent_scope: u64) -> u64 {
         self.scope_counter += 1;
@@ -349,6 +360,7 @@ impl AsmGenerator {
         for block_item in block {
             asm.add_instructions(self.gen_block_item(block_item, child_scope));
         }
+        asm.add_instructions(self.remove_scope(child_scope));
         asm
     }
 
