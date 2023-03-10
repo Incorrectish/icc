@@ -63,7 +63,12 @@ pub enum Statement {
     Expression(Expression),
     Conditional(Expression, Box<Statement>, Box<Option<Statement>>),
     Block(Vec<BlockItem>),
-    For(Option<Expression>, Expression, Option<Expression>, Box<Statement>),
+    For(
+        Option<Expression>,
+        Expression,
+        Option<Expression>,
+        Box<Statement>,
+    ),
     ForDecl(Declaration, Expression, Option<Expression>, Box<Statement>),
     While(Expression, Box<Statement>),
     Do(Box<Statement>, Expression),
@@ -86,6 +91,7 @@ pub enum BlockItem {
 #[derive(Debug)]
 pub enum FuncDecl {
     Func(String, Vec<String>, Vec<BlockItem>),
+    FuncPrototype(String, Vec<String>),
 }
 
 #[derive(Debug)]
@@ -116,6 +122,9 @@ impl FuncDecl {
     pub fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         let indentation = INDENT.repeat(depth);
         match self {
+            FuncDecl::FuncPrototype(ref name, ref args) => {
+                println!("{indentation}'{parent_scope}prototype\n{indentation}'{parent_scope}: fn {name} -> int\n{indentation}'{parent_scope}: params: {args:?}\n{indentation})");
+            }
             FuncDecl::Func(ref indentifier, ref arguments, ref block_items) => {
                 println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: {arguments:?}\n{indentation}'{parent_scope}: begin:");
                 *scope += 1;
@@ -139,7 +148,7 @@ impl BlockItem {
 }
 
 impl Declaration {
-    pub fn print(&self, depth: usize, parent_scope: u64,) {
+    pub fn print(&self, depth: usize, parent_scope: u64) {
         match self {
             Self::Declare(name, optional_expression, optional_child_declaration) => {
                 let indentation = INDENT.repeat(depth);
@@ -195,7 +204,7 @@ impl Statement {
                     statement.print(depth, scope, curr_scope);
                 }
                 println!("{lower_indent}'{}: end", parent_scope);
-            },
+            }
             Self::Continue => println!("{indentation}'{parent_scope}: continue"),
             Self::Break => println!("{indentation}'{parent_scope}: break"),
             Self::ForDecl(decl, exp2, opt_exp3, statement) => {
@@ -223,27 +232,27 @@ impl Statement {
                 }
                 println!();
                 statement.print(depth + 1, scope, parent_scope);
-            },
+            }
             Self::Do(statement, exp) => {
                 println!("{indentation}'{parent_scope}: do ");
                 statement.print(depth + 1, scope, parent_scope);
                 print!("{indentation}'{parent_scope}: while ");
                 exp.print();
                 println!();
-            },
+            }
             Self::While(exp, statement) => {
                 print!("{indentation}'{parent_scope}: while ");
                 exp.print();
                 println!();
                 statement.print(depth + 1, scope, parent_scope);
-            },
+            }
         }
     }
 }
 
 pub fn print_for_decl(decl: &Declaration) {
     let mut opt_decl = Some(decl);
-    while let Some(decl) = opt_decl{
+    while let Some(decl) = opt_decl {
         match decl {
             ast::Declaration::Declare(ident, opt_exp, opt_decl2) => {
                 print!("int {ident}");
@@ -269,7 +278,7 @@ impl Expression {
                 if matches!(
                     operator,
                     UnaryOperator::PostfixIncrement(_) | UnaryOperator::PostfixDecrement(_)
-                    ) {
+                ) {
                     print!("<");
                     expression.print();
                     print!(">");

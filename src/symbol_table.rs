@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{fail, asm_gen::LONG_SIZE};
+use crate::{asm_gen::LONG_SIZE, fail};
 
 // The start of the function parameters is 16 not 8 to make room for the return address of the
 // function and the base pointer
@@ -48,7 +48,8 @@ impl SymbolTable {
     pub fn create_function_arguments(&mut self, scope: u64, arguments: &Vec<String>) {
         let mut top_of_stack = 16;
         for argument in arguments.iter().rev() {
-            self.scoped_variables_to_location.insert((argument.clone(), scope), format!("{top_of_stack}(%rbp)"));
+            self.scoped_variables_to_location
+                .insert((argument.clone(), scope), format!("{top_of_stack}(%rbp)"));
             top_of_stack += LONG_SIZE;
         }
     }
@@ -72,18 +73,16 @@ impl SymbolTable {
     pub fn create_scope(&mut self, scope: u64, parent: u64) {
         // println!("Creating scope '{scope} with parent '{parent}");
         self.parents.insert(scope, Some(parent));
-        self.scope_to_top_of_stack
-            .insert(
-                scope,
-                // keep the top of the stack pointer the same, but the allocation size for the
-                // scope should be 0
-                *self.scope_to_top_of_stack.get(&parent).expect(&format!("scope '{scope} not created"))
-            );
-        self.size_of_scopes
-            .insert(
-                scope,
-                0,
-            );
+        self.scope_to_top_of_stack.insert(
+            scope,
+            // keep the top of the stack pointer the same, but the allocation size for the
+            // scope should be 0
+            *self
+                .scope_to_top_of_stack
+                .get(&parent)
+                .expect(&format!("scope '{scope} not created")),
+        );
+        self.size_of_scopes.insert(scope, 0);
     }
 
     pub fn allocate(
@@ -93,7 +92,10 @@ impl SymbolTable {
         size: u64, /* parent_scope: u64 */
     ) -> String {
         let new_location = self.gen_location(size, curr_scope);
-        if self.scoped_variables_to_location.contains_key(&(name.clone(), curr_scope)) {
+        if self
+            .scoped_variables_to_location
+            .contains_key(&(name.clone(), curr_scope))
+        {
             fail!("Variable {name} already defined in scope '{curr_scope}");
         } else {
             // TODO SO MANY BUGS maybe
@@ -122,7 +124,10 @@ impl SymbolTable {
             if value.is_some() {
                 return value;
             }
-            parent = *self.parents.get(&curr_scope).expect("Scope not properly added with create scope, smh :(");
+            parent = *self
+                .parents
+                .get(&curr_scope)
+                .expect("Scope not properly added with create scope, smh :(");
         }
         // self.debug_scope(scope);
         // println!("{:?}", self.symbol_table);
@@ -140,11 +145,14 @@ impl SymbolTable {
     }
 
     pub fn gen_location(&mut self, allocation: u64, scope: u64) -> String {
-        *self.size_of_scopes.get_mut(&scope).expect("Scope '{curr_scope} doesn't have a top of stack") += allocation;
-        *self.scope_to_top_of_stack.get_mut(&scope).expect("Scope '{curr_scope} doesn't have a size") += allocation;
-        format!(
-            "-{}(%rbp)",
-            self.scope_to_top_of_stack[&scope]
-        )
+        *self
+            .size_of_scopes
+            .get_mut(&scope)
+            .expect("Scope '{curr_scope} doesn't have a top of stack") += allocation;
+        *self
+            .scope_to_top_of_stack
+            .get_mut(&scope)
+            .expect("Scope '{curr_scope} doesn't have a size") += allocation;
+        format!("-{}(%rbp)", self.scope_to_top_of_stack[&scope])
     }
 }

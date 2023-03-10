@@ -61,13 +61,19 @@ impl Asm {
     }
 
     pub fn add_instr_two_before_end(&mut self, assembly: Asm) {
-        let end = self.instructions.remove(self.instructions.len() - 1).expect("Should have these elements :(");
-        let end2 = self.instructions.remove(self.instructions.len() - 1).expect("Should have these elements :(");
+        let end = self
+            .instructions
+            .remove(self.instructions.len() - 1)
+            .expect("Should have these elements :(");
+        let end2 = self
+            .instructions
+            .remove(self.instructions.len() - 1)
+            .expect("Should have these elements :(");
         self.add_instructions(assembly);
         self.instructions.push_back(end2);
         self.instructions.push_back(end);
     }
-    
+
     pub fn from_instr(instructions: Vec<AsmInstr>, mut assembly: Asm) -> Self {
         let mut result = Asm {
             instructions: mem::take(&mut assembly.instructions),

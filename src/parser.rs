@@ -67,8 +67,15 @@ impl Parser {
         }
 
         let token = self.lexer.next().expect("Missing opening brace");
-        if !matches!(token, Token::OpenBrace) {
-            fail!("Needs opening brace, got {token:?}");
+        match token {
+            Token::Semicolon => {
+                return Some(ast::FuncDecl::FuncPrototype(indentifier, args));
+            }
+            Token::OpenBrace => {}
+            _ => {
+                self.lexer.print_line_with_caret();
+                fail!("Expected `{{` or `;`, found {token:?}")
+            }
         }
 
         // TODO: fix this in case it is not working

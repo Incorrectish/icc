@@ -12,6 +12,8 @@ pub const LONG_SIZE: u64 = 8;
 #[allow(unused)]
 pub const INT_SIZE: u64 = 4;
 
+pub const ARGUMENT_REGISTERS: [&'static str; 6] = ["%rdi", "%rsi", "%rdx", "%rcx", "%r8d", "%r9d"];
+
 #[allow(dead_code)]
 pub struct AsmGenerator {
     jump_counter: u64,
@@ -42,15 +44,18 @@ impl AsmGenerator {
         let mut asm = Asm::default();
         match ast {
             // parses the program header
-            ast::Prog::Prog(function_declarations) => {
-                for function_declaration in &function_declarations {
+            ast::Prog::Prog(mut function_declarations) => {
+                for function_declaration in &mut function_declarations {
                     match function_declaration {
                         ast::FuncDecl::Func(ref name, ref arguments, _) => {
                             self.function_table.insert(name.clone(), arguments.clone());
                         }
+                        ast::FuncDecl::FuncPrototype(name, args) => {
+                            self.function_table.insert(std::mem::take(name), std::mem::take(args));
+                        }
                     }
                 }
-                for function_declaration in function_declarations {
+                for function_declaration in function_declarations.into_iter().filter(|function| matches!(function, ast::FuncDecl::Func(_, _, _))) {
                     asm.add_instructions(self.gen_function(function_declaration, child_scope));
                 }
             }
@@ -69,7 +74,8 @@ impl AsmGenerator {
                 assembly.append_instruction("pushq".to_string(), "%rbp".to_string());
                 assembly.append_instruction("movq".to_string(), "%rsp,%rbp".to_string());
                 let child_scope = self.create_scope(parent_scope);
-                self.symbol_table.create_function_arguments(child_scope, &arguments);
+                self.symbol_table
+                    .create_function_arguments(child_scope, &arguments);
                 for statement in statements {
                     assembly.add_instructions(self.gen_block_item(statement, child_scope));
                 }
@@ -96,6 +102,7 @@ impl AsmGenerator {
                 //     assembly.append_instruction("ret".into(), String::new());
                 // }
             }
+            ast::FuncDecl::FuncPrototype(_, _) => {unreachable!()},
         }
     }
 
@@ -220,7 +227,13 @@ impl AsmGenerator {
                 let mut asm = self.gen_declaration(decl, child_scope);
                 let (begin_for_name, begin_for_label) = self.gen_new_label();
                 asm.append_instruction(begin_for_label, String::new());
-                asm.add_instructions(self.gen_for_loop(exp1, exp2, body, child_scope, begin_for_name));
+                asm.add_instructions(self.gen_for_loop(
+                    exp1,
+                    exp2,
+                    body,
+                    child_scope,
+                    begin_for_name,
+                ));
                 asm.add_instructions(self.remove_scope(child_scope));
                 asm
             }
@@ -233,7 +246,13 @@ impl AsmGenerator {
                     Asm::default()
                 };
                 asm.append_instruction(begin_for_label, String::new());
-                asm.add_instructions(self.gen_for_loop(exp1, exp2, body, parent_scope, begin_for_name));
+                asm.add_instructions(self.gen_for_loop(
+                    exp1,
+                    exp2,
+                    body,
+                    parent_scope,
+                    begin_for_name,
+                ));
                 asm
             }
             ast::Statement::Return(expression) => {
@@ -449,14 +468,20 @@ impl AsmGenerator {
                     fail!("Function `{name}` referenced but not created");
                 } else if (arguments.len() != self.function_table[&name].len()) {
                     // TODO make better error here: which vars are required etc
-                    fail!("Function `{name}` requires {} arguments, but got {} arguments", self.function_table[&name].len(), arguments.len());
+                    fail!(
+                        "Function `{name}` requires {} arguments, but got {} arguments",
+                        self.function_table[&name].len(),
+                        arguments.len()
+                    );
                 } else {
                     // function has been created and has the right amount of arguments
                     let mut asm = Asm::default();
                     asm.append_instruction("pushq".to_string(), "%rbx".to_string());
-                    let dealloc_amt = 8 * arguments.len();
+                    // let dealloc_amt = 8 * (arguments.len() - 6);
+                    let dealloc_amt = 8 * (arguments.len());
                     for argument in arguments.into_iter().rev() {
                         asm.add_instructions(self.gen_expression(argument, parent_scope));
+                        // TODO get arguments in registers instead of stack
                         asm.append_instruction("pushq".to_string(), "%rax".to_string());
                     }
                     asm.append_instruction("call".to_string(), name);
@@ -466,7 +491,7 @@ impl AsmGenerator {
                     asm.append_instruction("popq".to_string(), format!("%rbx"));
                     asm
                 }
-            },
+            }
         }
     }
 
@@ -477,7 +502,6 @@ impl AsmGenerator {
         right_expr: Box<Expression>,
         parent_scope: u64,
     ) -> Asm {
-
         match binary_operator {
             BinaryOperator::LogicalOr => {
                 let mut left_exp = self.gen_expression(*left_expr, parent_scope);
@@ -513,7 +537,6 @@ impl AsmGenerator {
                 left_exp.append_instruction("setne".into(), "%al".into());
                 left_exp.append_instruction(label2, "".into());
                 return left_exp;
-
             }
             _ => {}
         }
@@ -704,7 +727,7 @@ impl AsmGenerator {
         }
     }
 
-    // Returns (name, label), for example it could return (".L1", ".L1:") 
+    // Returns (name, label), for example it could return (".L1", ".L1:")
     fn gen_new_label(&mut self) -> (String, String) {
         let label = format!(".L{}", self.jump_counter);
         let name = format!("{label}:");
