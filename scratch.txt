@@ -25,7 +25,8 @@ to modify a
 PRESSING BUGS: Seg fault that is probably related to not properly deallocating
 stack memory(too much i think), for loop smh, non decl
 
-Something is broken
+Something is broken with the calculations
+Ok the exact problem seems to be using local variables with functions????
 
 
 

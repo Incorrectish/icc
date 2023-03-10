@@ -453,6 +453,7 @@ impl AsmGenerator {
                 } else {
                     // function has been created and has the right amount of arguments
                     let mut asm = Asm::default();
+                    asm.append_instruction("pushq".to_string(), "%rbx".to_string());
                     let dealloc_amt = 8 * arguments.len();
                     for argument in arguments.into_iter().rev() {
                         asm.add_instructions(self.gen_expression(argument, parent_scope));
@@ -462,6 +463,7 @@ impl AsmGenerator {
                     // TODO when variables can have a differing size, change this into a for loop
                     // to calculate the amount to deallocate
                     asm.append_instruction("addq".to_string(), format!("${dealloc_amt},%rsp"));
+                    asm.append_instruction("popq".to_string(), format!("%rbx"));
                     asm
                 }
             },
@@ -475,6 +477,47 @@ impl AsmGenerator {
         right_expr: Box<Expression>,
         parent_scope: u64,
     ) -> Asm {
+
+        match binary_operator {
+            BinaryOperator::LogicalOr => {
+                let mut left_exp = self.gen_expression(*left_expr, parent_scope);
+                // left_exp.append_instruction("popq".into(), "%rbx".into());
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
+                let (label1_name, label1) = self.gen_new_label();
+                let (label2_name, label2) = self.gen_new_label();
+                left_exp.append_instruction("je".into(), label1_name);
+                left_exp.append_instruction("movq".into(), "$1,%rax".into());
+                left_exp.append_instruction("jmp".into(), label2_name);
+                left_exp.append_instruction(label1, "".into());
+                let right_exp = self.gen_expression(*right_expr, parent_scope);
+                left_exp.add_instructions(right_exp);
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
+                left_exp.append_instruction("movq".into(), "$0,%rax".into());
+                left_exp.append_instruction("setne".into(), "%al".into());
+                left_exp.append_instruction(label2, "".into());
+                return left_exp;
+            }
+            BinaryOperator::LogicalAnd => {
+                let mut left_exp = self.gen_expression(*left_expr, parent_scope);
+                // left_exp.append_instruction("popq".into(), "%rbx".into());
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
+                let (label1_name, label1) = self.gen_new_label();
+                let (label2_name, label2) = self.gen_new_label();
+                left_exp.append_instruction("jne".into(), label1_name);
+                left_exp.append_instruction("jmp".into(), label2_name);
+                left_exp.append_instruction(label1, "".into());
+                let right_exp = self.gen_expression(*right_expr, parent_scope);
+                left_exp.add_instructions(right_exp);
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
+                left_exp.append_instruction("movq".into(), "$0,%rax".into());
+                left_exp.append_instruction("setne".into(), "%al".into());
+                left_exp.append_instruction(label2, "".into());
+                return left_exp;
+
+            }
+            _ => {}
+        }
+
         let mut left_exp = self.gen_expression(*left_expr, parent_scope);
         // Left expression is in %rbx, right will be in %rax
         left_exp.append_instruction("movq".into(), "%rax,%rbx".into());
@@ -482,15 +525,7 @@ impl AsmGenerator {
         left_exp.add_instructions(right_exp);
         // Moves left expression to %rax, and right to %rbx
         left_exp.append_instruction("xchg".into(), "%rbx,%rax".into());
-        let binop = if !matches!(
-            binary_operator,
-            BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr
-        ) {
-            Self::binary_operation(&binary_operator)
-        } else {
-            String::new()
-        };
-
+        let binop = Self::binary_operation(&binary_operator);
         match binary_operator {
             BinaryOperator::Divide => {
                 // we want to divide left by right expression, so we must exchange the contents of rbx
@@ -543,36 +578,7 @@ impl AsmGenerator {
                 left_exp.append_instruction(binop, "%al".into());
                 // left_exp.append_instruction("pushq".into(), "%rax".into());
             }
-            BinaryOperator::LogicalOr => {
-                // left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
-                let (label1_name, label1) = self.gen_new_label();
-                let (label2_name, label2) = self.gen_new_label();
-                let (label3_name, label3) = self.gen_new_label();
-                left_exp.append_instruction("jne".into(), label1_name);
-                left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
-                left_exp.append_instruction("je".into(), label2_name);
-                left_exp.append_instruction(label1, "".into());
-                left_exp.append_instruction("movq".into(), "$1,%rax".into());
-                left_exp.append_instruction("jmp".into(), label3_name);
-                left_exp.append_instruction(label2, "".into());
-                left_exp.append_instruction("xorq".into(), "%rax,%rax".into());
-                left_exp.append_instruction(label3, "".into());
-            }
-            BinaryOperator::LogicalAnd => {
-                // left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
-                let (label1_name, label1) = self.gen_new_label();
-                let (label2_name, label2) = self.gen_new_label();
-                left_exp.append_instruction("je".into(), label1_name.clone());
-                left_exp.append_instruction("cmpq".into(), "$0,%rbx".into());
-                left_exp.append_instruction("je".into(), label1_name);
-                left_exp.append_instruction("movq".into(), "$1,%rax".into());
-                left_exp.append_instruction("jmp".into(), label2_name);
-                left_exp.append_instruction(label1, "".into());
-                left_exp.append_instruction("xorq".into(), "%rax,%rax".into());
-                left_exp.append_instruction(label2, "".into());
-            }
+            BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => unreachable!(),
             _ => {
                 // Note the following might be a bit of a premature optimization. I assume that the
                 // size of the data is 4 bytes, so I can read the first two values off the stack
