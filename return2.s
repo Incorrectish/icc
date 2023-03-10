@@ -1,82 +1,85 @@
-.globl fib
-fib: 
+.globl add
+add: 
 pushq %rbp
 movq %rsp,%rbp
-movq 16(%rbp),%rax
+movq 24(%rbp),%rax
 movq %rax,%rbx
-movq $0,%rax
-xchg %rbx,%rax
-cmpq %rax,%rbx
-movq $0,%rax
-sete %al
-cmpq $0,%rax
-je .L0
-movq $1,%rax
-jmp .L1
-.L0: 
 movq 16(%rbp),%rax
-movq %rax,%rbx
-movq $1,%rax
-xchg %rbx,%rax
-cmpq %rax,%rbx
-movq $0,%rax
-sete %al
-cmpq $0,%rax
-movq $0,%rax
-setne %al
-.L1: 
-cmpq $0,%rax
-je .L2
-movq 16(%rbp),%rax
-popq %rbp
-ret 
-addq $0,%rsp
-jmp .L3
-.L2: 
-pushq %rbx
-movq 16(%rbp),%rax
-movq %rax,%rbx
-movq $1,%rax
-xchg %rbx,%rax
-subq %rbx,%rax
-pushq %rax
-call fib
-addq $8,%rsp
-popq %rbx
-movq %rax,%rbx
-pushq %rbx
-movq 16(%rbp),%rax
-movq %rax,%rbx
-movq $2,%rax
-xchg %rbx,%rax
-subq %rbx,%rax
-pushq %rax
-call fib
-addq $8,%rsp
-popq %rbx
 xchg %rbx,%rax
 addq %rbx,%rax
-popq %rbp
-ret 
 addq $0,%rsp
-.L3: 
-addq $0,%rsp
-xorq %rax,%rax
 popq %rbp
 ret 
 .globl main
 main: 
 pushq %rbp
 movq %rsp,%rbp
-movq $10,%rax
+movq $7,%rax
 movq %rax,-8(%rbp)
 subq $8,%rsp
-pushq %rbx
+movq $0,%rax
+movq %rax,-16(%rbp)
+subq $8,%rsp
+movq $0,%rax
+movq %rax,-24(%rbp)
+subq $8,%rsp
+movq $0,%rax
+movq %rax,-32(%rbp)
+subq $8,%rsp
+.L0: 
+movq -32(%rbp),%rax
+movq %rax,%rbx
+movq $10,%rax
+xchg %rbx,%rax
+cmpq %rbx,%rax
+movq $0,%rax
+setl %al
+cmpq $0, %rax
+je .L1
+subq $8,%rsp
+movq $0,%rax
+movq %rax,-40(%rbp)
+.L2: 
+movq -40(%rbp),%rax
+movq %rax,%rbx
+movq $10,%rax
+xchg %rbx,%rax
+cmpq %rbx,%rax
+movq $0,%rax
+setl %al
+cmpq $0, %rax
+je .L3
 movq -8(%rbp),%rax
+movq %rax,%rbx
+pushq %rbx
+movq -40(%rbp),%rax
+addq $1,-40(%rbp)
+movq -40(%rbp),%rax
 pushq %rax
-call fib
-addq $8,%rsp
+movq -32(%rbp),%rax
+movq -32(%rbp),%rax
+addq $1,-32(%rbp)
+pushq %rax
+call add
+addq $16,%rsp
 popq %rbx
+xchg %rbx,%rax
+addq %rbx,%rax
+movq %rax,-8(%rbp)
+addq $0,%rsp
+movq -40(%rbp),%rax
+addq $1,-40(%rbp)
+movq -40(%rbp),%rax
+jmp .L2
+.L3: 
 addq $8,%rsp
+movq -32(%rbp),%rax
+movq -32(%rbp),%rax
+addq $1,-32(%rbp)
+jmp .L0
+.L1: 
+addq $8,%rsp
+movq -8(%rbp),%rax
+addq $24,%rsp
 popq %rbp
 ret 

@@ -328,10 +328,10 @@ impl AsmGenerator {
             asm.append_instruction("cmpq".to_string(), "$0, %rax".to_string());
             asm.append_instruction("je".to_string(), end_for_name);
         }
+        asm.add_instructions(self.gen_statement(*body, parent_scope));
         if let Some(expr) = optional_exp {
             asm.add_instructions(self.gen_expression(expr, parent_scope));
         }
-        asm.add_instructions(self.gen_statement(*body, parent_scope));
         asm.append_instruction("jmp".to_string(), begin_for_name);
         asm.append_instruction(end_for_label, String::new());
         asm
