@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     assembly::{Asm, AsmInstr},
     ast,
@@ -15,6 +17,8 @@ pub struct AsmGenerator {
     jump_counter: u64,
     scope_counter: u64,
     symbol_table: SymbolTable,
+    // maps function names to arguments
+    function_table: HashMap<String, Vec<String>>,
     // Going to need a hashmap like variable names: stack position
     // Suggestion, create a wrapper struct with #[repr(transparent)], so that you
     // can add a push method, which doesn't modify existing elements, unlike hashmap insert
@@ -27,6 +31,7 @@ impl AsmGenerator {
             jump_counter: 0,
             scope_counter: 0,
             symbol_table: SymbolTable::new(),
+            function_table: HashMap::new(),
         }
     }
 
@@ -38,6 +43,13 @@ impl AsmGenerator {
         match ast {
             // parses the program header
             ast::Prog::Prog(function_declarations) => {
+                for function_declaration in &function_declarations {
+                    match function_declaration {
+                        ast::FuncDecl::Func(ref name, ref arguments, _) => {
+                            self.function_table.insert(name.clone(), arguments.clone());
+                        }
+                    }
+                }
                 for function_declaration in function_declarations {
                     asm.add_instructions(self.gen_function(function_declaration, child_scope));
                 }
@@ -51,38 +63,38 @@ impl AsmGenerator {
         match function_declaration {
             ast::FuncDecl::Func(indentifier, arguments, statements) => {
                 let mut assembly = Asm::default();
+                let identifier_label = format!("{indentifier}:");
+                assembly.append_instruction(".globl".to_string(), indentifier);
+                assembly.append_instruction(identifier_label, String::new());
+                assembly.append_instruction("pushq".to_string(), "%rbp".to_string());
+                assembly.append_instruction("movq".to_string(), "%rsp,%rbp".to_string());
                 let child_scope = self.create_scope(parent_scope);
+                self.symbol_table.create_function_arguments(child_scope, &arguments);
                 for statement in statements {
                     assembly.add_instructions(self.gen_block_item(statement, child_scope));
                 }
-                assembly.add_instructions(self.remove_scope(child_scope));
                 // TODO: this might not work with conditionals, as the last statement is like
                 // ".L{\w}"
                 // let last = assembly.last();
                 // if let Some(last) = assembly.
                 match assembly.last() {
-                    Some(last) if last.command() == "ret" => {}
+                    Some(last) if last.command() == "ret" => {
+                        assembly.add_instr_two_before_end(self.remove_scope(child_scope));
+                    }
                     _ => {
+                        assembly.add_instructions(self.remove_scope(child_scope));
                         assembly.append_instruction("xorq".into(), "%rax,%rax".into());
                         assembly.append_instruction("popq".into(), "%rbp".into());
                         assembly.append_instruction("ret".into(), String::new());
                     }
                 }
+                assembly
                 // todo!()
                 // TODO: branch analysis is bad on this
                 // if assembly.last().command() != "ret" {
                 //     assembly.append_instruction("xorq".into(), "%rax,%rax".into());
                 //     assembly.append_instruction("ret".into(), String::new());
                 // }
-                Asm::from_instr(
-                    vec![
-                        AsmInstr::new("movq".to_string(), "%rsp,%rbp".to_string()),
-                        AsmInstr::new("pushq".to_string(), "%rbp".to_string()),
-                        AsmInstr::new(format!("{indentifier}:"), String::new()),
-                        AsmInstr::new(".globl".to_string(), indentifier),
-                    ],
-                    assembly,
-                )
             }
         }
     }
@@ -116,9 +128,10 @@ impl AsmGenerator {
                     // TODO: There may not need to be any instructions because we can just let it
                     // have whatever memory is already in the adress, like C stadard
                     // let asm = Asm::instruction("movq".into(), format!("$0, {location}"));
+                    // WRONG WRONG MUST SUBTRACT SIZE :(
                     //asm
                     let _location = self.symbol_table.allocate(name, parent_scope, LONG_SIZE);
-                    Asm::default()
+                    Asm::instruction("subq".to_string(), format!("${LONG_SIZE},%rsp"))
                 };
                 if let Some(child_declaration) = *optional_child_declaration {
                     declaration_assembly
@@ -431,6 +444,27 @@ impl AsmGenerator {
                 asm.append_instruction(endternary_label, String::new());
                 asm
             }
+            ast::Expression::FunctionCall(name, arguments) => {
+                if !self.function_table.contains_key(&name) {
+                    fail!("Function `{name}` referenced but not created");
+                } else if (arguments.len() != self.function_table[&name].len()) {
+                    // TODO make better error here: which vars are required etc
+                    fail!("Function `{name}` requires {} arguments, but got {} arguments", self.function_table[&name].len(), arguments.len());
+                } else {
+                    // function has been created and has the right amount of arguments
+                    let mut asm = Asm::default();
+                    let dealloc_amt = 8 * arguments.len();
+                    for argument in arguments.into_iter().rev() {
+                        asm.add_instructions(self.gen_expression(argument, parent_scope));
+                        asm.append_instruction("pushq".to_string(), "%rax".to_string());
+                    }
+                    asm.append_instruction("call".to_string(), name);
+                    // TODO when variables can have a differing size, change this into a for loop
+                    // to calculate the amount to deallocate
+                    asm.append_instruction("addq".to_string(), format!("${dealloc_amt},%rsp"));
+                    asm
+                }
+            },
         }
     }
 

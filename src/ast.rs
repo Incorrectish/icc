@@ -53,6 +53,7 @@ pub enum Expression {
     Assign(String, Box<Expression>),
     ReferenceVariable(String),
     Ternary(Box<Expression>, Box<Expression>, Box<Expression>),
+    FunctionCall(String, Vec<Expression>),
     NullExp,
 }
 
@@ -302,6 +303,15 @@ impl Expression {
                 exp2.print();
                 print!(" : ");
                 exp3.print();
+                print!("]");
+            }
+            Expression::FunctionCall(name, arguments) => {
+                print!("({name} ");
+                print!("[");
+                for argument in arguments {
+                    argument.print();
+                    print!(", ")
+                }
                 print!("]");
             }
         }

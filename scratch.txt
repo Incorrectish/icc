@@ -22,6 +22,10 @@ to modify a
 
 
 
+PRESSING BUGS: Seg fault that is probably related to not properly deallocating
+stack memory(too much i think), for loop smh, non decl
+
+Something is broken
 
 
 
