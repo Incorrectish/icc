@@ -1,0 +1,8 @@
+Binary operations, some should be in %rcx instead of rbx, in the case where the
+right expression is a nested expression, it overwrited rbx -> bad
+
+Function calls aren't evaluating the parameters in the right order?
+fix this 
+
+in addition this evaluates to 0??? fix also
+int a = sum(1, 2) - (sum(1, 2) / 2) * 2;

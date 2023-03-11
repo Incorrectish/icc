@@ -1,7 +1,8 @@
-int foo(int a){
-    return 3 + a;
+int sum(int a, int b) {
+    return a + b;
 }
 
-int main(){
-    return foo();
+int main() {
+    int a = sum(1, 2) - (sum(1, 2) / 2) * 2;
+    return a;
 }

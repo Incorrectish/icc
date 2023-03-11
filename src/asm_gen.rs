@@ -4,8 +4,9 @@ use crate::{
     assembly::{Asm, AsmInstr},
     ast,
     ast::{BinaryOperator, Expression},
+    context::Context,
     fail,
-    symbol_table::SymbolTable, context::Context,
+    symbol_table::SymbolTable,
 };
 
 pub const LONG_SIZE: u64 = 8;
@@ -21,6 +22,7 @@ pub struct AsmGenerator {
     symbol_table: SymbolTable,
     // maps function names to arguments
     function_table: HashMap<String, Vec<String>>,
+    function_prototype_table: HashMap<String, Vec<String>>,
     // Going to need a hashmap like variable names: stack position
     // Suggestion, create a wrapper struct with #[repr(transparent)], so that you
     // can add a push method, which doesn't modify existing elements, unlike hashmap insert
@@ -34,6 +36,7 @@ impl AsmGenerator {
             scope_counter: 0,
             symbol_table: SymbolTable::new(),
             function_table: HashMap::new(),
+            function_prototype_table: HashMap::new(),
         }
     }
 
@@ -48,14 +51,36 @@ impl AsmGenerator {
                 for function_declaration in &mut function_declarations {
                     match function_declaration {
                         ast::FuncDecl::Func(ref name, ref arguments, _) => {
+                            let potential_args_length = self.function_prototype_table.get(name);
+                            if let Some(args_length) = potential_args_length {
+                                if arguments.len() != args_length.len() {
+                                    fail!("Function `{name}` declared with `{}` arguments, but initialized with `{}` arguments", args_length.len(), arguments.len());
+                                }
+                            }
+                            if self.function_table.contains_key(name) {
+                                fail!("Function {name} already declared");
+                            }
                             self.function_table.insert(name.clone(), arguments.clone());
                         }
                         ast::FuncDecl::FuncPrototype(name, args) => {
-                            self.function_table.insert(std::mem::take(name), std::mem::take(args));
+                            let potential_args_length = self.function_table.get(name);
+                            if let Some(args_length) = potential_args_length {
+                                if args.len() != args_length.len() {
+                                    fail!("Function `{name}` initialized with `{}` arguments, but declared here with `{}` arguments", args_length.len(), args.len());
+                                }
+                            }
+                            if self.function_prototype_table.contains_key(name) {
+                                fail!("Function prototype {name} already declared");
+                            }
+                            self.function_prototype_table
+                                .insert(std::mem::take(name), std::mem::take(args));
                         }
                     }
                 }
-                for function_declaration in function_declarations.into_iter().filter(|function| matches!(function, ast::FuncDecl::Func(_, _, _))) {
+                for function_declaration in function_declarations
+                    .into_iter()
+                    .filter(|function| matches!(function, ast::FuncDecl::Func(_, _, _)))
+                {
                     asm.add_instructions(self.gen_function(function_declaration, child_scope));
                 }
             }
@@ -102,13 +127,22 @@ impl AsmGenerator {
                 //     assembly.append_instruction("ret".into(), String::new());
                 // }
             }
-            ast::FuncDecl::FuncPrototype(_, _) => {unreachable!()},
+            ast::FuncDecl::FuncPrototype(_, _) => {
+                unreachable!()
+            }
         }
     }
 
-    fn gen_block_item(&mut self, block_item: ast::BlockItem, parent_scope: u64, potential_context: &Option<Context>) -> Asm {
+    fn gen_block_item(
+        &mut self,
+        block_item: ast::BlockItem,
+        parent_scope: u64,
+        potential_context: &Option<Context>,
+    ) -> Asm {
         match block_item {
-            ast::BlockItem::Statement(statement) => self.gen_statement(statement, parent_scope, potential_context),
+            ast::BlockItem::Statement(statement) => {
+                self.gen_statement(statement, parent_scope, potential_context)
+            }
             ast::BlockItem::Declaration(declaration) => {
                 self.gen_declaration(declaration, parent_scope)
             }
@@ -214,7 +248,12 @@ impl AsmGenerator {
         asm
     }
 
-    fn gen_statement(&mut self, statement: ast::Statement, parent_scope: u64, potential_context: &Option<Context>) -> Asm {
+    fn gen_statement(
+        &mut self,
+        statement: ast::Statement,
+        parent_scope: u64,
+        potential_context: &Option<Context>,
+    ) -> Asm {
         match statement {
             ast::Statement::Continue => {
                 if let Some(context) = potential_context {
@@ -222,14 +261,14 @@ impl AsmGenerator {
                 } else {
                     fail!("Cannot continue from a non loop context");
                 }
-            },
+            }
             ast::Statement::Break => {
                 if let Some(context) = potential_context {
                     Asm::instruction("jmp".to_string(), context.break_jump())
                 } else {
                     fail!("Cannot break from a non loop context");
                 }
-            },
+            }
             ast::Statement::While(expression, statement) => {
                 self.gen_while_loop(expression, statement, parent_scope)
             }
@@ -239,12 +278,7 @@ impl AsmGenerator {
             ast::Statement::ForDecl(decl, exp1, exp2, body) => {
                 let child_scope = self.create_scope(parent_scope);
                 let mut asm = self.gen_declaration(decl, child_scope);
-                asm.add_instructions(self.gen_for_loop(
-                    exp1,
-                    exp2,
-                    body,
-                    child_scope,
-                ));
+                asm.add_instructions(self.gen_for_loop(exp1, exp2, body, child_scope));
                 asm.add_instructions(self.remove_scope(child_scope));
                 asm
             }
@@ -255,12 +289,7 @@ impl AsmGenerator {
                 } else {
                     Asm::default()
                 };
-                asm.add_instructions(self.gen_for_loop(
-                    exp1,
-                    exp2,
-                    body,
-                    parent_scope,
-                ));
+                asm.add_instructions(self.gen_for_loop(exp1, exp2, body, parent_scope));
                 asm
             }
             ast::Statement::Return(expression) => {
@@ -291,7 +320,11 @@ impl AsmGenerator {
                     AsmInstr::new("je".into(), else_.clone()),
                 ]));
                 // for statement in if_children {
-                asm.add_instructions(self.gen_statement(*if_children, parent_scope, potential_context));
+                asm.add_instructions(self.gen_statement(
+                    *if_children,
+                    parent_scope,
+                    potential_context,
+                ));
                 // }
                 if let Some(else_children) = *potential_else_children {
                     // TODO: get labels, else, and endofif
@@ -301,7 +334,11 @@ impl AsmGenerator {
                         AsmInstr::new(else_label, String::new()),
                     ]));
                     // for statement in else_children {
-                    asm.add_instructions(self.gen_statement(else_children, parent_scope, potential_context));
+                    asm.add_instructions(self.gen_statement(
+                        else_children,
+                        parent_scope,
+                        potential_context,
+                    ));
                     // }
                     asm.add_instructions(Asm::instruction(endif_label, String::new()))
                 } else {
@@ -352,7 +389,7 @@ impl AsmGenerator {
         //     <loop_body>
         // after_body:
         //     <post_expression>
-        //     jump loop 
+        //     jump loop
         // after_loop:
         let mut asm = Asm::default();
         let (begin_for_name, begin_for_label) = self.gen_new_label();
@@ -405,7 +442,12 @@ impl AsmGenerator {
          */
     }
 
-    fn gen_block(&mut self, block: Vec<ast::BlockItem>, parent_scope: u64, potential_context: &Option<Context>) -> Asm {
+    fn gen_block(
+        &mut self,
+        block: Vec<ast::BlockItem>,
+        parent_scope: u64,
+        potential_context: &Option<Context>,
+    ) -> Asm {
         let mut asm = Asm::default();
         let _ = self.create_scope(parent_scope);
         let child_scope = self.scope_counter;
@@ -614,7 +656,7 @@ impl AsmGenerator {
             BinaryOperator::Equal
             | BinaryOperator::NotEqual
             | BinaryOperator::GreaterEq
-            | BinaryOperator::Greater 
+            | BinaryOperator::Greater
             | BinaryOperator::LessEq
             | BinaryOperator::Less => {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
