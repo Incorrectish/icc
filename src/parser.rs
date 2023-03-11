@@ -43,6 +43,7 @@ impl Parser {
         let _ = self.lexer.peek()?; // returns none if there are no tokens left
         let token = self.lexer.next();
         if !matches!(token, Some(Token::KeywordInt)) {
+            self.lexer.print_line_with_caret();
             fail!("Needs int return type, got {token:?}");
         }
 
@@ -50,11 +51,13 @@ impl Parser {
         let indentifier = if let Token::Identifier(ident) = token {
             ident
         } else {
+            self.lexer.print_line_with_caret();
             fail!("Needs int return type, got {token:?}");
         };
 
         let token = self.lexer.next().expect("Missing opening parentheses");
         if !matches!(token, Token::OpenParen) {
+            self.lexer.print_line_with_caret();
             fail!("Needs opening parentheses, got {token:?}");
         }
 
@@ -63,6 +66,7 @@ impl Parser {
 
         let token = self.lexer.next().expect("Missing closing parentheses");
         if !matches!(token, Token::CloseParen) {
+            self.lexer.print_line_with_caret();
             fail!("Needs closing parentheses, got {token:?}");
         }
 
@@ -87,6 +91,7 @@ impl Parser {
 
         let token = self.lexer.next().expect("Missing closing brace");
         if !matches!(token, Token::CloseBrace) {
+            self.lexer.print_line_with_caret();
             fail!("Needs closing brace, got {token:?}");
         }
 
@@ -181,6 +186,7 @@ impl Parser {
                 let _ = self.lexer.next();
                 let next = self.lexer.next();
                 if !matches!(next, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
                     fail!("Missing semicolon, got {token:?} instead");
                 }
                 Some(ast::Statement::Break)
@@ -193,19 +199,23 @@ impl Parser {
                     .expect("Expected statement after `do`");
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::KeywordWhile)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected while, got {token:?}");
                 }
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::OpenParen)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected obening parentheses, got {token:?}");
                 }
                 let expression = self.parse_expression();
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::CloseParen)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected closing parentheses, got {token:?}");
                 }
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected semicolon, got {token:?}");
                 }
                 Some(ast::Statement::Do(Box::new(statement), expression))
@@ -214,11 +224,13 @@ impl Parser {
                 let _ = self.lexer.next();
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::OpenParen)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected opening parentheses, got {token:?}");
                 }
                 let expression = self.parse_expression();
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::CloseParen)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected closing parentheses, got {token:?}");
                 }
                 let statement = self
@@ -235,6 +247,7 @@ impl Parser {
                 let _ = self.lexer.next();
                 let next = self.lexer.next();
                 if !matches!(next, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
                     fail!("Missing semicolon, got {token:?} instead");
                 }
                 Some(ast::Statement::Continue)
@@ -247,6 +260,7 @@ impl Parser {
         let _ = self.lexer.next();
         let open_paren = self.lexer.next();
         if !matches!(open_paren, Some(Token::OpenParen)) {
+            self.lexer.print_line_with_caret();
             fail!("Expected opening parentheses, got {open_paren:?}");
         }
         let potential_decl = self.lexer.peek();
@@ -256,6 +270,7 @@ impl Parser {
             let expression = self.parse_expression();
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
                 fail!("Expected semicolon, got {token:?}")
             }
             let token = self.lexer.peek();
@@ -274,6 +289,7 @@ impl Parser {
                 let exp2 = self.parse_expression();
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::CloseParen)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected semicolon, got {token:?}")
                 }
                 let statement = self
@@ -290,11 +306,13 @@ impl Parser {
             let exp1 = self.parse_expression();
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
                 fail!("Expected semicolon, got {token:?}")
             }
             let expression = self.parse_expression();
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
                 fail!("Expected semicolon, got {token:?}")
             }
             let token = self.lexer.peek();
@@ -313,6 +331,7 @@ impl Parser {
                 let exp2 = self.parse_expression();
                 let token = self.lexer.next();
                 if !matches!(token, Some(Token::CloseParen)) {
+            self.lexer.print_line_with_caret();
                     fail!("Expected closing parentheses, got {token:?}")
                 }
                 let statement = self
@@ -333,10 +352,12 @@ impl Parser {
         unreachable!()
     };
         let Token::OpenParen = self.lexer.next().expect("Needs opening parentheses around if condition") else {
+            self.lexer.print_line_with_caret();
         fail!("Needed opening parens around if");
     };
         let expression = self.parse_expression();
         let Token::CloseParen = self.lexer.next().expect("Needs closing parentheses around if condition") else {
+            self.lexer.print_line_with_caret();
         fail!("Needed closing parens around if");
     };
         let if_body = self
@@ -444,6 +465,7 @@ impl Parser {
         let statement = ast::Statement::Return(exp);
         let token = self.lexer.next().expect("Invalid token sequence");
         if !matches!(token, Token::Semicolon) {
+            self.lexer.print_line_with_caret();
             fail!("Needs semicolon, got {token:?}");
         }
         statement
@@ -474,12 +496,15 @@ impl Parser {
                     (exp, next_decl)
                 },
                 Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_declaration()))},
-                _ => fail!(
+                _ => {
+            self.lexer.print_line_with_caret();
+                    fail!(
                     "Expected assignment operator[=] or end of statement[;], got {token:?}, ast Node until now = :?"
-                ),
+                )},
             };
             ast::Declaration::Declare(variable_name, expression, Box::new(next_assignment))
         } else {
+            self.lexer.print_line_with_caret();
             fail!("Expected variable name, got {token:?}");
         }
     }
@@ -535,6 +560,7 @@ impl Parser {
         let mut args = vec![];
         loop {
             if let Some(Token::CloseParen) = self.lexer.peek() {
+                    let _ = self.lexer.next();
                 return ast::Expression::FunctionCall(name, args);
             }
             let expression = self.parse_expression();
@@ -565,6 +591,7 @@ impl Parser {
             let term_two = self.parse_expression();
             let token = self.lexer.peek();
             if !matches!(token, Some(Token::Colon)) {
+            self.lexer.print_line_with_caret();
                 fail!("Expected `:` after ternary expression, found {token:?}");
             }
             let _ = self.lexer.next();
@@ -729,7 +756,9 @@ impl Parser {
                 Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::ReferenceVariable(other_name)))},
                 Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
                 Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression())),
-                _ => fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead"),
+                _ => {
+            self.lexer.print_line_with_caret();
+                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
             }
         },
         Some(Token::LogicalNot) => {
@@ -738,7 +767,9 @@ impl Parser {
                 Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
                 Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
                 Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression())),
-                _ => fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead"),
+                _ => {
+            self.lexer.print_line_with_caret();
+                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
             }
         },
         Some(Token::Minus) => {
@@ -747,7 +778,9 @@ impl Parser {
                 Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
                 Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
                 Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression())),
-                _ => fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead"),
+                _ => {
+            self.lexer.print_line_with_caret();
+                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
             }
         },
         Some(Token::PrefixDecrement(name)) => {
@@ -759,7 +792,9 @@ impl Parser {
                 },
                 Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
                 Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(self.parse_expression())),
-                _ => fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead"),
+                _ => {
+            self.lexer.print_line_with_caret();
+                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
             }
         },
         Some(Token::PrefixIncrement(name)) => {
@@ -768,13 +803,16 @@ impl Parser {
                 Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))},
                 Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
                 Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(self.parse_expression())),
-                _ => fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead"),
+                _ => {
+            self.lexer.print_line_with_caret();
+                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
             }
         },
         Some(Token::OpenParen) => {
             let expression = self.parse_expression();
             let next_token = self.lexer.next();
             if !matches!(next_token, Some(Token::CloseParen)) {
+            self.lexer.print_line_with_caret();
                 fail!("Token must be an closing parentheses, instead got {next_token:?}");
             }
             expression
@@ -809,7 +847,9 @@ impl Parser {
                 }
             }
         }
-        _ => fail!("Token must be an expression, instead got {token:?}, lexer: \n {:?}", self.lexer.clone().collect::<Vec<_>>()),
+        _ => {
+            self.lexer.print_line_with_caret();
+            fail!("Token must be an expression, instead got {token:?}")},
     }
     }
 
