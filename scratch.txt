@@ -54,3 +54,39 @@ jmp .startofwhile
 
 
 
+
+
+
+If I have a for loop like this:
+
+decl/init expression 
+.start 
+jmp end if not exp1 
+statement 
+post_expr
+.end 
+
+
+<init-expression>
+loop:
+    <check_condition>
+    <loop_body>
+after_body:
+    <post_expression>
+    jump loop 
+after_loop:
+
+
+
+
+decl/init expr 
+jmp start 
+.end
+postexpr
+
+.start 
+statement
+
+
+continue is somewhere inside the statement 
+I can't jump to pos expr, but statement has to skip the rest of it 

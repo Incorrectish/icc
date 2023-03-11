@@ -5,7 +5,7 @@ use crate::{
     ast,
     ast::{BinaryOperator, Expression},
     fail,
-    symbol_table::SymbolTable,
+    symbol_table::SymbolTable, context::Context,
 };
 
 pub const LONG_SIZE: u64 = 8;
@@ -77,7 +77,7 @@ impl AsmGenerator {
                 self.symbol_table
                     .create_function_arguments(child_scope, &arguments);
                 for statement in statements {
-                    assembly.add_instructions(self.gen_block_item(statement, child_scope));
+                    assembly.add_instructions(self.gen_block_item(statement, child_scope, &None));
                 }
                 // TODO: this might not work with conditionals, as the last statement is like
                 // ".L{\w}"
@@ -106,9 +106,9 @@ impl AsmGenerator {
         }
     }
 
-    fn gen_block_item(&mut self, block_item: ast::BlockItem, parent_scope: u64) -> Asm {
+    fn gen_block_item(&mut self, block_item: ast::BlockItem, parent_scope: u64, potential_context: &Option<Context>) -> Asm {
         match block_item {
-            ast::BlockItem::Statement(statement) => self.gen_statement(statement, parent_scope),
+            ast::BlockItem::Statement(statement) => self.gen_statement(statement, parent_scope, potential_context),
             ast::BlockItem::Declaration(declaration) => {
                 self.gen_declaration(declaration, parent_scope)
             }
@@ -165,8 +165,9 @@ impl AsmGenerator {
         // let expression = dbg!(expression);
         let (start_of_while_name, start_of_while_label) = self.gen_new_label();
         let (end_of_while_name, end_of_while_label) = self.gen_new_label();
+        let context = Context::new(start_of_while_name.clone(), end_of_while_name.clone());
         let mut asm = Asm::instruction(start_of_while_label, String::new());
-        let stmt = self.gen_statement(*statement, parent_scope);
+        let stmt = self.gen_statement(*statement, parent_scope, &Some(context));
         stmt.print();
         asm.add_instructions(stmt);
         let exp = self.gen_expression(expression, parent_scope);
@@ -196,6 +197,7 @@ impl AsmGenerator {
         // let expression = dbg!(expression);
         let (start_of_while_name, start_of_while_label) = self.gen_new_label();
         let (end_of_while_name, end_of_while_label) = self.gen_new_label();
+        let context = Context::new(start_of_while_name.clone(), end_of_while_name.clone());
         let mut asm = Asm::instruction(start_of_while_label, String::new());
         let exp = self.gen_expression(expression, parent_scope);
         asm.add_instructions(exp);
@@ -204,7 +206,7 @@ impl AsmGenerator {
         // asm.append_instruction("sete".to_string(), "%al".to_string());
         asm.append_instruction("je".to_string(), end_of_while_name);
         let statement = dbg!(statement);
-        let stmt = self.gen_statement(*statement, parent_scope);
+        let stmt = self.gen_statement(*statement, parent_scope, &Some(context));
         stmt.print();
         asm.add_instructions(stmt);
         asm.append_instruction("jmp".to_string(), start_of_while_name);
@@ -212,10 +214,22 @@ impl AsmGenerator {
         asm
     }
 
-    fn gen_statement(&mut self, statement: ast::Statement, parent_scope: u64) -> Asm {
+    fn gen_statement(&mut self, statement: ast::Statement, parent_scope: u64, potential_context: &Option<Context>) -> Asm {
         match statement {
-            ast::Statement::Continue => todo!(),
-            ast::Statement::Break => todo!(),
+            ast::Statement::Continue => {
+                if let Some(context) = potential_context {
+                    Asm::instruction("jmp".to_string(), context.continue_jump())
+                } else {
+                    fail!("Cannot continue from a non loop context");
+                }
+            },
+            ast::Statement::Break => {
+                if let Some(context) = potential_context {
+                    Asm::instruction("jmp".to_string(), context.break_jump())
+                } else {
+                    fail!("Cannot break from a non loop context");
+                }
+            },
             ast::Statement::While(expression, statement) => {
                 self.gen_while_loop(expression, statement, parent_scope)
             }
@@ -225,33 +239,27 @@ impl AsmGenerator {
             ast::Statement::ForDecl(decl, exp1, exp2, body) => {
                 let child_scope = self.create_scope(parent_scope);
                 let mut asm = self.gen_declaration(decl, child_scope);
-                let (begin_for_name, begin_for_label) = self.gen_new_label();
-                asm.append_instruction(begin_for_label, String::new());
                 asm.add_instructions(self.gen_for_loop(
                     exp1,
                     exp2,
                     body,
                     child_scope,
-                    begin_for_name,
                 ));
                 asm.add_instructions(self.remove_scope(child_scope));
                 asm
             }
             ast::Statement::For(optional_exp, exp1, exp2, body) => {
                 // same as for decl generally, except the very first part
-                let (begin_for_name, begin_for_label) = self.gen_new_label();
                 let mut asm: Asm = if let Some(exp) = optional_exp {
                     self.gen_expression(exp, parent_scope)
                 } else {
                     Asm::default()
                 };
-                asm.append_instruction(begin_for_label, String::new());
                 asm.add_instructions(self.gen_for_loop(
                     exp1,
                     exp2,
                     body,
                     parent_scope,
-                    begin_for_name,
                 ));
                 asm
             }
@@ -283,7 +291,7 @@ impl AsmGenerator {
                     AsmInstr::new("je".into(), else_.clone()),
                 ]));
                 // for statement in if_children {
-                asm.add_instructions(self.gen_statement(*if_children, parent_scope));
+                asm.add_instructions(self.gen_statement(*if_children, parent_scope, potential_context));
                 // }
                 if let Some(else_children) = *potential_else_children {
                     // TODO: get labels, else, and endofif
@@ -293,7 +301,7 @@ impl AsmGenerator {
                         AsmInstr::new(else_label, String::new()),
                     ]));
                     // for statement in else_children {
-                    asm.add_instructions(self.gen_statement(else_children, parent_scope));
+                    asm.add_instructions(self.gen_statement(else_children, parent_scope, potential_context));
                     // }
                     asm.add_instructions(Asm::instruction(endif_label, String::new()))
                 } else {
@@ -314,7 +322,7 @@ impl AsmGenerator {
                 // if else.is_none
                 // end_of_if
             }
-            ast::Statement::Block(block) => self.gen_block(block, parent_scope),
+            ast::Statement::Block(block) => self.gen_block(block, parent_scope, potential_context),
         }
     }
 
@@ -338,16 +346,28 @@ impl AsmGenerator {
         optional_exp: Option<Expression>,
         body: Box<ast::Statement>,
         parent_scope: u64,
-        begin_for_name: String,
     ) -> Asm {
+        // loop:
+        //     <check_condition>
+        //     <loop_body>
+        // after_body:
+        //     <post_expression>
+        //     jump loop 
+        // after_loop:
         let mut asm = Asm::default();
+        let (begin_for_name, begin_for_label) = self.gen_new_label();
+        asm.append_instruction(begin_for_label, String::new());
         let (end_for_name, end_for_label) = self.gen_new_label();
+        let (after_for_name, after_for_label) = self.gen_new_label();
+        let context = Context::new(after_for_name, end_for_name.clone());
         if !matches!(exp, Expression::NullExp) {
             asm.add_instructions(self.gen_expression(exp, parent_scope));
-            asm.append_instruction("cmpq".to_string(), "$0, %rax".to_string());
+            println!("Hello");
+            asm.append_instruction("cmpq".to_string(), "$0,%rax".to_string());
             asm.append_instruction("je".to_string(), end_for_name);
         }
-        asm.add_instructions(self.gen_statement(*body, parent_scope));
+        asm.add_instructions(self.gen_statement(*body, parent_scope, &Some(context)));
+        asm.append_instruction(after_for_label, String::new());
         if let Some(expr) = optional_exp {
             asm.add_instructions(self.gen_expression(expr, parent_scope));
         }
@@ -385,13 +405,13 @@ impl AsmGenerator {
          */
     }
 
-    fn gen_block(&mut self, block: Vec<ast::BlockItem>, parent_scope: u64) -> Asm {
+    fn gen_block(&mut self, block: Vec<ast::BlockItem>, parent_scope: u64, potential_context: &Option<Context>) -> Asm {
         let mut asm = Asm::default();
         let _ = self.create_scope(parent_scope);
         let child_scope = self.scope_counter;
         // let parent_scope = self.scope_counter;
         for block_item in block {
-            asm.add_instructions(self.gen_block_item(block_item, child_scope));
+            asm.add_instructions(self.gen_block_item(block_item, child_scope, potential_context));
         }
         asm.add_instructions(self.remove_scope(child_scope));
         asm
@@ -547,6 +567,7 @@ impl AsmGenerator {
         let right_exp = self.gen_expression(*right_expr, parent_scope);
         left_exp.add_instructions(right_exp);
         // Moves left expression to %rax, and right to %rbx
+        // todo!("This may not work because rbx may be overwritten when the right expression is itself an expressino and not a constant value");
         left_exp.append_instruction("xchg".into(), "%rbx,%rax".into());
         let binop = Self::binary_operation(&binary_operator);
         match binary_operator {
@@ -582,21 +603,23 @@ impl AsmGenerator {
                 left_exp.append_instruction(binop, "%rbx,%rax".into());
             }
             // The following might need to be fixed
-            BinaryOperator::LessEq | BinaryOperator::Less => {
-                // left_exp.append_instruction("popq".into(), "%rbx".into());
-                // left_exp.append_instruction("popq".into(), "%rax".into());
-                left_exp.append_instruction("cmpq".into(), "%rbx,%rax".into());
-                left_exp.append_instruction("movq".into(), "$0,%rax".into());
-                left_exp.append_instruction(binop, "%al".into());
-                // left_exp.append_instruction("pushq".into(), "%rax".into());
-            }
+            // => {
+            //     // left_exp.append_instruction("popq".into(), "%rbx".into());
+            //     // left_exp.append_instruction("popq".into(), "%rax".into());
+            //     left_exp.append_instruction("cmpq".into(), "%rbx,%rax".into());
+            //     left_exp.append_instruction("movq".into(), "$0,%rax".into());
+            //     left_exp.append_instruction(binop, "%al".into());
+            //     // left_exp.append_instruction("pushq".into(), "%rax".into());
+            // }
             BinaryOperator::Equal
             | BinaryOperator::NotEqual
             | BinaryOperator::GreaterEq
-            | BinaryOperator::Greater => {
+            | BinaryOperator::Greater 
+            | BinaryOperator::LessEq
+            | BinaryOperator::Less => {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
                 // left_exp.append_instruction("popq".into(), "%rax".into());
-                left_exp.append_instruction("cmpq".into(), "%rax,%rbx".into());
+                left_exp.append_instruction("cmpq".into(), "%rbx,%rax".into());
                 left_exp.append_instruction("movq".into(), "$0,%rax".into());
                 left_exp.append_instruction(binop, "%al".into());
                 // left_exp.append_instruction("pushq".into(), "%rax".into());

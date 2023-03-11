@@ -8,6 +8,7 @@ mod lexer;
 mod parser;
 mod symbol_table;
 mod token;
+mod context;
 
 fn main() {
     // Command args contain the binary directory relative path as the first argument, so the second
