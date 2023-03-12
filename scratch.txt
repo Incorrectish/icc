@@ -31,6 +31,21 @@ Ok the exact problem seems to be using local variables with functions????
 
 
 
+(1 + 2) + (2 + (3 + 4))
+1 => rax => rbx 
+2 => rax
+swp rax rbx 
+add rbx rax 
+rax => rbx(result 1 + 2 in rbx)
+---- 
+2 in rax => rcx 
+--
+3 => rax => rbx 
+4 => rax 
+swp rax rbx
+add rbx rax 
+
+
 
 
 
