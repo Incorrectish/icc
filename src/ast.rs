@@ -90,8 +90,8 @@ pub enum BlockItem {
 
 #[derive(Debug)]
 pub enum FuncDecl {
-    Func(Var, Vec<String>, Vec<BlockItem>),
-    FuncPrototype(Var, Vec<String>),
+    Func(Var, Vec<Var>, Vec<BlockItem>),
+    FuncPrototype(Var, Vec<Var>),
 }
 
 #[derive(Debug)]
@@ -123,10 +123,10 @@ impl FuncDecl {
         let indentation = INDENT.repeat(depth);
         match self {
             FuncDecl::FuncPrototype(ref var, ref args) => {
-                println!("{indentation}'{parent_scope}prototype\n{indentation}'{parent_scope}: fn {name} -> {var_type}\n{indentation}'{parent_scope}: params: {args:?}\n{indentation})", var_type = var.type_(), name = var.name());
+                println!("{indentation}'{parent_scope}prototype\n{indentation}'{parent_scope}: fn {var}\n{indentation}'{parent_scope}: params: {args:?}\n{indentation})");
             }
             FuncDecl::Func(ref var, ref arguments, ref block_items) => {
-                println!("{indentation}'{parent_scope}: fn {name} -> {var_type}\n{indentation}'{parent_scope}: params: {arguments:?}\n{indentation}'{parent_scope}: begin:", var_type = var.type_(), name = var.name());
+                println!("{indentation}'{parent_scope}: fn {var}\n{indentation}'{parent_scope}: params: {arguments:?}\n{indentation}'{parent_scope}: begin:");
                 *scope += 1;
                 let curr_scope = *scope;
                 for block_item in block_items {
@@ -153,11 +153,11 @@ impl Declaration {
             Self::Declare(var, optional_expression, optional_child_declaration) => {
                 let indentation = INDENT.repeat(depth);
                 if let Some(expr) = optional_expression {
-                    print!("{indentation}'{parent_scope}: {var_type} {name} = ", var_type = var.type_(), name = var.name());
+                    print!("{indentation}'{parent_scope}: {var} = ");
                     expr.print();
                     println!();
                 } else {
-                    println!("{indentation}'{parent_scope}: {var_type} {name} = ", var_type = var.type_(), name = var.name());
+                    println!("{indentation}'{parent_scope}: {var} = ");
                 }
                 if let Some(child_declaration) = optional_child_declaration.as_ref() {
                     child_declaration.print(depth, parent_scope);
@@ -255,7 +255,7 @@ pub fn print_for_decl(decl: &Declaration) {
     while let Some(decl) = opt_decl {
         match decl {
             ast::Declaration::Declare(var, opt_exp, opt_decl2) => {
-                print!("{var_type} {name} = ", var_type = var.type_(), name = var.name());
+                print!("{var} = ");
                 if let Some(exp) = opt_exp {
                     print!(" ");
                     exp.print();

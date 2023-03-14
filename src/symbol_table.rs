@@ -1,9 +1,19 @@
 use std::collections::HashMap;
 
+use lazy_static::lazy_static;
+
 use crate::{
-    asm_gen::LONG_SIZE,
-    fail
+    fail, variable::Var
 };
+
+lazy_static! {
+    pub static ref TYPE_SIZES: HashMap<&'static str, u64> = {
+        let mut map = HashMap::new();
+        map.insert("int", 4);
+        map.insert("long", 8);
+        map
+    };
+}
 
 // The start of the function parameters is 16 not 8 to make room for the return address of the
 // function and the base pointer
@@ -14,6 +24,7 @@ pub const START_OF_FUNCTION_PARAMETERS: u64 = 16;
 pub struct SymbolTable {
     // maps variable + scope to location
     scoped_variables_to_location: HashMap<(String, u64), String>,
+    scoped_variables_to_type: HashMap<(String, u64), &'static str>,
     // maps scopes to (top of stack, size of current scope)
     // TODO these can potentially be turned into vectors, including parents because scopes are
     // always 1..last scope, and just -1 to find them(indexing) or something
@@ -27,6 +38,7 @@ impl SymbolTable {
     pub fn new() -> Self {
         Self {
             scoped_variables_to_location: HashMap::default(),
+            scoped_variables_to_type: HashMap::default(),
             scope_to_top_of_stack: {
                 let mut map = HashMap::new();
                 map.insert(0, 0);
@@ -52,14 +64,17 @@ impl SymbolTable {
     // DO NOT EVER CALL THIS FUNCTION EXCEPT TO CREATE FUNCTION ARGUMENTS. IT PURPOSELY DOESN'T
     // ALLOCATE SPACE AND USES ADRESSES THAT WILL NEVER WORK OTHERWISE. This function also will not
     // deallocate the arguments properly, the caller MUST do that
-    pub fn create_function_arguments(&mut self, scope: u64, arguments: &Vec<String>) {
+    pub fn create_function_arguments(&mut self, scope: u64, arguments: &Vec<Var>) {
         // let arguments = dbg!(arguments);
         let mut top_of_stack = 16;
         for argument in arguments.iter().rev() {
+            let name = argument.name();
+            let type_ = argument.type_();
             self.scoped_variables_to_location
-                .insert((argument.clone(), scope), format!("{top_of_stack}(%rbp)"));
-            dbg!((argument, top_of_stack));
-            top_of_stack += LONG_SIZE;
+                .insert((name.clone(), scope), format!("{top_of_stack}(%rbp)"));
+            self.scoped_variables_to_type
+                .insert((name.clone(), scope), type_);
+            top_of_stack += TYPE_SIZES[type_];
         }
     }
 
@@ -96,20 +111,23 @@ impl SymbolTable {
 
     pub fn allocate(
         &mut self,
-        name: String,
+        var: Var, 
         curr_scope: u64,
-        size: u64, /* parent_scope: u64 */
     ) -> String {
+        let size = TYPE_SIZES[var.type_()];
         let new_location = self.gen_location(size, curr_scope);
         if self
             .scoped_variables_to_location
-            .contains_key(&(name.clone(), curr_scope))
+            .contains_key(&(var.name().clone(), curr_scope))
         {
-            fail!("Variable {name} already defined in scope '{curr_scope}");
+            fail!("Variable {name} already defined in scope '{curr_scope}", name = var.name());
         } else {
             // TODO SO MANY BUGS maybe
             self.scoped_variables_to_location
-                .insert((name, curr_scope), new_location.clone());
+                .insert((var.name().clone(), curr_scope), new_location.clone());
+            todo!();
+            self.scoped_variables_to_type
+                .insert((var.name().clone(), curr_scope), var.type_());
             // println!("symbol table is {:?}", self.symbol_table);
             // *self.size_of_scopes.get_mut(&curr_scope).expect("Scope '{curr_scope} doesn't have a top of stack") += size;
             // *self.scope_to_top_of_stack.get_mut(&curr_scope).expect("Scope '{curr_scope} doesn't have a size") += size;

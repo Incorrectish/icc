@@ -101,7 +101,7 @@ impl Parser {
     }
 
     // gets all the arguments
-    fn parse_arguments(&mut self) -> Vec<String> {
+    fn parse_arguments(&mut self) -> Vec<Var> {
         let mut args = vec![];
         while let Some(Token::KeywordType(var_type)) = self.lexer.peek() {
             // dbg!("hi");
@@ -109,7 +109,7 @@ impl Parser {
             let _ = self.lexer.next();
             let ident = self.lexer.next();
             match ident {
-                Some(Token::Identifier(name)) => args.push(name),
+                Some(Token::Identifier(name)) => args.push(Var::new(name, var_type)),
                 _ => {
                     self.lexer.print_line_with_caret();
                     fail!("Expected `identifier` found token {ident:?}");
