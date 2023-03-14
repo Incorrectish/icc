@@ -270,7 +270,7 @@ impl Parser {
             let expression = self.parse_expression();
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
-            self.lexer.print_line_with_caret();
+                self.lexer.print_line_with_caret();
                 fail!("Expected semicolon, got {token:?}")
             }
             let token = self.lexer.peek();
@@ -462,6 +462,7 @@ impl Parser {
             fail("This should always be the return keyword".into());
         }
         let exp = self.parse_expression();
+        println!("{exp:#?}");
         let statement = ast::Statement::Return(exp);
         let token = self.lexer.next().expect("Invalid token sequence");
         if !matches!(token, Token::Semicolon) {
@@ -553,7 +554,11 @@ impl Parser {
     // TODO: Error messages, error messages
     fn parse_expression(&mut self) -> ast::Expression {
         // TODO:
-        self.parse_conditional_expr()
+        let next = self.lexer.peek();
+        match next {
+            Some(Token::Semicolon) => ast::Expression::NullExp,
+            _ => self.parse_conditional_expr()
+        }
     }
 
     fn parse_function_call(&mut self, name: String) -> ast::Expression {
@@ -751,62 +756,84 @@ impl Parser {
             ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
         }
         Some(Token::BitwiseComplement) => {
-            let next_token = self.lexer.peek();
-            match next_token {
-                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::ReferenceVariable(other_name)))},
-                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression())),
-                _ => {
-            self.lexer.print_line_with_caret();
-                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
-            }
+            // let next_token = self.lexer.peek();
+            let exp = self.parse_expression();
+            ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(exp))
+            // match next_token {
+            //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+            //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+            //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression())),
+            //     _ => {
+            // self.lexer.print_line_with_caret();
+            //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+            // }
         },
         Some(Token::LogicalNot) => {
-            let next_token = self.lexer.peek();
-            match next_token {
-                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
-                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression())),
-                _ => {
-            self.lexer.print_line_with_caret();
-                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
-            }
+            let exp = self.parse_expression();
+            ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(exp))
+            // let next_token = self.lexer.peek();
+            // match next_token {
+            //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+            //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+            //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression())),
+            //     _ => {
+            // self.lexer.print_line_with_caret();
+            //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+            // }
         },
         Some(Token::Minus) => {
-            let next_token = self.lexer.peek();
-            match next_token {
-                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
-                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression())),
-                _ => {
-            self.lexer.print_line_with_caret();
-                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
-            }
+            let exp = self.parse_expression();
+            ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(exp))
+            // let next_token = self.lexer.peek();
+            // match next_token {
+            //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+            //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+            //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression())),
+            //     _ => {
+            // self.lexer.print_line_with_caret();
+            //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+            // }
         },
         Some(Token::PrefixDecrement(name)) => {
             let next_token = self.lexer.peek();
             match next_token {
                 Some(Token::Identifier(other_name)) => {
                     let _ = self.lexer.next(); 
+                    let peek = self.lexer.peek();
+                    match peek {
+                        Some(Token::OpenParen) => {
+                            self.lexer.print_line_with_caret();
+                            fail!("Cannot decrement a temporary(result of a function)")
+                        }
+                        _ => {}
+                    }
                     ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))
                 },
-                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(self.parse_expression())),
                 _ => {
-            self.lexer.print_line_with_caret();
-                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+                    self.lexer.print_line_with_caret();
+                    fail!("Prefix decrement must be succeeded by a variable reference, found {next_token:?} instead")},
             }
         },
         Some(Token::PrefixIncrement(name)) => {
             let next_token = self.lexer.peek();
             match next_token {
-                Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))},
-                Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-                Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(self.parse_expression())),
+                Some(Token::Identifier(other_name)) => {
+                    let _ = self.lexer.next(); 
+                    let peek = self.lexer.peek();
+                    match peek {
+                        Some(Token::OpenParen) => {
+                            self.lexer.print_line_with_caret();
+                            fail!("Cannot increment a temporary(result of a function)")
+                        }
+                        _ => {}
+                    }
+                    ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))
+                },
                 _ => {
-            self.lexer.print_line_with_caret();
-                    fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+                    self.lexer.print_line_with_caret();
+                    fail!("Prefix decrement must be succeeded by a variable reference, found {next_token:?} instead")},
             }
+
         },
         Some(Token::OpenParen) => {
             let expression = self.parse_expression();

@@ -700,7 +700,7 @@ impl AsmGenerator {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
                 // left_exp.append_instruction("popq".into(), "%rax".into());
                 // left_exp.append_instruction(binop, "(%rsp),%rbx".into());
-                left_exp.append_instruction(binop, "rcx,rax".into());
+                left_exp.append_instruction(binop, "%rcx,%rax".into());
                 // TODO, part of the result will be in rdx
                 // left_exp.append_instruction("movq".into(), "%rbx,(%rsp)".into());
                 // left_exp.append_instruction("pushq".into(), "%rax".into());

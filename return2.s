@@ -2,94 +2,37 @@
 main: 
 pushq %rbp
 movq %rsp,%rbp
-movq $5,%rax
-pushq %rax
-call foo
-addq $8,%rsp
-# $0 being returned
-addq $0,%rsp
-popq %rbp
-ret 
-.globl foo
-foo: 
-pushq %rbp
-movq %rsp,%rbp
-# start of if
-movq 16(%rbp),%rax
-pushq %rax
 movq $0,%rax
-movq %rax,%rcx
-popq %rax
-cmpq %rcx,%rax
-movq $0,%rax
-setle %al
-cmpq $0,%rax
-je .L0
-# start of conditional body
-movq 16(%rbp),%rax
-# $0 being returned
-addq $0,%rsp
-popq %rbp
-ret 
-addq $0,%rsp
+movq %rax,-8(%rbp)
+subq $8,%rsp
 .L0: 
-movq 16(%rbp),%rax
-pushq %rax
-movq 16(%rbp),%rax
+movq -8(%rbp),%rax
 pushq %rax
 movq $1,%rax
 movq %rax,%rcx
 popq %rax
-subq %rcx,%rax
-pushq %rax
-call bar
-addq $8,%rsp
-movq %rax,%rcx
-popq %rax
 addq %rcx,%rax
-# $0 being returned
-addq $0,%rsp
-popq %rbp
-ret 
-.globl bar
-bar: 
-pushq %rbp
-movq %rsp,%rbp
+movq %rax,-8(%rbp)
 # start of if
-movq 16(%rbp),%rax
+movq -8(%rbp),%rax
 pushq %rax
-movq $0,%rax
+movq $3,%rax
 movq %rax,%rcx
 popq %rax
 cmpq %rcx,%rax
 movq $0,%rax
-setle %al
+setg %al
 cmpq $0,%rax
-je .L1
+je .L3
 # start of conditional body
-movq 16(%rbp),%rax
-# $0 being returned
+jmp .L1
+.L3: 
 addq $0,%rsp
-popq %rbp
-ret 
-addq $0,%rsp
+.L2: 
+jmp .L0
 .L1: 
-movq 16(%rbp),%rax
-pushq %rax
-movq 16(%rbp),%rax
-pushq %rax
-movq $2,%rax
-movq %rax,%rcx
-popq %rax
-cqo 
-idivq %rcx
-pushq %rax
-call bar
+movq -8(%rbp),%rax
+# $8 being returned
 addq $8,%rsp
-movq %rax,%rcx
-popq %rax
-addq %rcx,%rax
-# $0 being returned
-addq $0,%rsp
 popq %rbp
 ret 

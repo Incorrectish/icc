@@ -15,7 +15,7 @@ fn main() {
     // argument will be the filename given to the compiler
     let filename = env::args().nth(1).expect("Please provide a file to lex");
     // test_lexer(Path::new(&filename));
-    test_ast(Path::new(&filename));
+    // test_ast(Path::new(&filename));
     compile(Path::new(&filename));
     // test_output(Path::new(&filename));
 }
@@ -36,10 +36,12 @@ fn compile(filename: &Path) {
     let Ok(_) = Asm::write(asm, &asm_file) else {panic!("Could not write to assembly file")};
 
     let parent_path = filename.parent().unwrap_or(Path::new(""));
+    dbg!(filename.with_extension(""));
     dbg!(Command::new("gcc")
         .arg(&asm_file)
         .arg("-o")
-        .arg(parent_path.join("out"))
+        .arg(filename.with_extension(""))
+        // .arg(parent_path.join(filename))
         .output()
         .expect("Failed to run assembler"));
 
