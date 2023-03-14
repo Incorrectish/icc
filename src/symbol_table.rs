@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{asm_gen::LONG_SIZE, fail};
+use crate::{
+    asm_gen::LONG_SIZE,
+    fail
+};
 
 // The start of the function parameters is 16 not 8 to make room for the return address of the
 // function and the base pointer

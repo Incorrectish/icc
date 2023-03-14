@@ -1,7 +1,7 @@
 use crate::{
     ast::{self, BinaryOperator},
     lexer::Lexer,
-    token::Token,
+    token::Token, variable::Var,
 };
 
 // does exactly what you think
@@ -42,11 +42,12 @@ impl Parser {
     fn parse_func(&mut self) -> Option<ast::FuncDecl> {
         let _ = self.lexer.peek()?; // returns none if there are no tokens left
         let token = self.lexer.next();
-        if !matches!(token, Some(Token::KeywordType(_))) {
-            todo!();
+        let fn_type = if let Some(Token::KeywordType(fn_type)) = token {
+            fn_type
+        } else {
             self.lexer.print_line_with_caret();
-            fail!("Needs int return type, got {token:?}");
-        }
+            fail!("Function needs return type, got {token:?}");
+        };
 
         let token = self.lexer.next().expect("Missing function name");
         let indentifier = if let Token::Identifier(ident) = token {
@@ -74,7 +75,7 @@ impl Parser {
         let token = self.lexer.next().expect("Missing opening brace");
         match token {
             Token::Semicolon => {
-                return Some(ast::FuncDecl::FuncPrototype(indentifier, args));
+                return Some(ast::FuncDecl::FuncPrototype(Var::new(indentifier, fn_type), args));
             }
             Token::OpenBrace => {}
             _ => {
@@ -96,14 +97,13 @@ impl Parser {
             fail!("Needs closing brace, got {token:?}");
         }
 
-        Some(ast::FuncDecl::Func(indentifier, args, statements))
+        Some(ast::FuncDecl::Func(Var::new(indentifier, fn_type), args, statements))
     }
 
     // gets all the arguments
     fn parse_arguments(&mut self) -> Vec<String> {
         let mut args = vec![];
-        while let Some(Token::KeywordType(_)) = self.lexer.peek() {
-            todo!();
+        while let Some(Token::KeywordType(var_type)) = self.lexer.peek() {
             // dbg!("hi");
             // self.lexer.print_line_with_caret();
             let _ = self.lexer.next();
@@ -138,11 +138,10 @@ impl Parser {
         // let token = self.lexer.next().expect("Invalid token sequence");
         let token = self.lexer.peek().expect("Invalid token sequence");
         match token {
-            Token::KeywordType(_) => {
-                todo!();
+            Token::KeywordType(var_type) => {
                 let _ = self.lexer.next();
                 self.lexer.peek();
-                let ret = Some(ast::BlockItem::Declaration(self.parse_declaration()));
+                let ret = Some(ast::BlockItem::Declaration(self.parse_declaration(var_type)));
                 // let Some(Token::Semicolon) = self.lexer.next() else {
                 //     fail!("Missing semicolon, :( {:?}", self.lexer.clone().collect::<Vec<_>>()
                 // };
@@ -267,10 +266,9 @@ impl Parser {
             fail!("Expected opening parentheses, got {open_paren:?}");
         }
         let potential_decl = self.lexer.peek();
-        if matches!(potential_decl, Some(Token::KeywordType(_))) {
-            todo!();
+        if let Some(Token::KeywordType(var_type)) = potential_decl {
             let _ = self.lexer.next();
-            let declaration = self.parse_declaration();
+            let declaration = self.parse_declaration(var_type);
             let expression = self.parse_expression();
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
@@ -476,7 +474,7 @@ impl Parser {
         statement
     }
 
-    fn parse_declaration(&mut self) -> ast::Declaration {
+    fn parse_declaration(&mut self, var_type: &'static str) -> ast::Declaration {
         let token = self.lexer.next().expect("Invalid token sequence");
         if let Token::Identifier(variable_name) = token {
             let token = self.lexer.peek().expect("Invalid token sequence");
@@ -488,7 +486,7 @@ impl Parser {
                     let next_tok = self.lexer.peek();
                     let next_decl = if let Some(Token::Comma) = next_tok {
                         let _ = self.lexer.next();
-                        Some(self.parse_declaration())
+                        Some(self.parse_declaration(var_type))
                     } else if let Some(Token::Semicolon) = next_tok {
                         let _semicolon = self.lexer.next();
                         // let see = self.lexer.next();
@@ -500,14 +498,14 @@ impl Parser {
                     };
                     (exp, next_decl)
                 },
-                Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_declaration()))},
+                Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_declaration(var_type)))},
                 _ => {
             self.lexer.print_line_with_caret();
                     fail!(
                     "Expected assignment operator[=] or end of statement[;], got {token:?}, ast Node until now = :?"
                 )},
             };
-            ast::Declaration::Declare(variable_name, expression, Box::new(next_assignment))
+            ast::Declaration::Declare(Var::new(variable_name, var_type), expression, Box::new(next_assignment))
         } else {
             self.lexer.print_line_with_caret();
             fail!("Expected variable name, got {token:?}");

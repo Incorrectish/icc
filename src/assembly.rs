@@ -209,6 +209,14 @@ impl Asm {
         );
     }
 
+    // opmitimazation again 
+    // mov $smth, register
+    // mov register, register2 
+    // popq register
+    // turned into 
+    // mov $smth register2 
+    // popq register
+
     fn optimize_useless_moves(&mut self) {
         // This entire loop simply goes through and removes any movq %reg,%reg
         for i in (0..self.instructions.len()).rev() {

@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::ast;
+use crate::{ast, variable::Var};
 
 // Indentation for pretty printing, made a constant so size can be easily changed
 pub const INDENT: &str = "    ";
@@ -78,7 +78,7 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub enum Declaration {
-    Declare(String, Option<Expression>, Box<Option<Declaration>>),
+    Declare(Var, Option<Expression>, Box<Option<Declaration>>),
 }
 
 #[derive(Debug)]
@@ -90,8 +90,8 @@ pub enum BlockItem {
 
 #[derive(Debug)]
 pub enum FuncDecl {
-    Func(String, Vec<String>, Vec<BlockItem>),
-    FuncPrototype(String, Vec<String>),
+    Func(Var, Vec<String>, Vec<BlockItem>),
+    FuncPrototype(Var, Vec<String>),
 }
 
 #[derive(Debug)]
@@ -122,11 +122,11 @@ impl FuncDecl {
     pub fn print(&self, depth: usize, scope: &mut u64, parent_scope: u64) {
         let indentation = INDENT.repeat(depth);
         match self {
-            FuncDecl::FuncPrototype(ref name, ref args) => {
-                println!("{indentation}'{parent_scope}prototype\n{indentation}'{parent_scope}: fn {name} -> int\n{indentation}'{parent_scope}: params: {args:?}\n{indentation})");
+            FuncDecl::FuncPrototype(ref var, ref args) => {
+                println!("{indentation}'{parent_scope}prototype\n{indentation}'{parent_scope}: fn {name} -> {var_type}\n{indentation}'{parent_scope}: params: {args:?}\n{indentation})", var_type = var.type_(), name = var.name());
             }
-            FuncDecl::Func(ref indentifier, ref arguments, ref block_items) => {
-                println!("{indentation}'{parent_scope}: fn {indentifier} -> int\n{indentation}'{parent_scope}: params: {arguments:?}\n{indentation}'{parent_scope}: begin:");
+            FuncDecl::Func(ref var, ref arguments, ref block_items) => {
+                println!("{indentation}'{parent_scope}: fn {name} -> {var_type}\n{indentation}'{parent_scope}: params: {arguments:?}\n{indentation}'{parent_scope}: begin:", var_type = var.type_(), name = var.name());
                 *scope += 1;
                 let curr_scope = *scope;
                 for block_item in block_items {
@@ -150,14 +150,14 @@ impl BlockItem {
 impl Declaration {
     pub fn print(&self, depth: usize, parent_scope: u64) {
         match self {
-            Self::Declare(name, optional_expression, optional_child_declaration) => {
+            Self::Declare(var, optional_expression, optional_child_declaration) => {
                 let indentation = INDENT.repeat(depth);
                 if let Some(expr) = optional_expression {
-                    print!("{indentation}'{parent_scope}: int {name} = ");
+                    print!("{indentation}'{parent_scope}: {var_type} {name} = ", var_type = var.type_(), name = var.name());
                     expr.print();
                     println!();
                 } else {
-                    println!("{indentation}'{parent_scope}: int {name}");
+                    println!("{indentation}'{parent_scope}: {var_type} {name} = ", var_type = var.type_(), name = var.name());
                 }
                 if let Some(child_declaration) = optional_child_declaration.as_ref() {
                     child_declaration.print(depth, parent_scope);
@@ -172,7 +172,7 @@ impl Statement {
         let indentation = INDENT.repeat(depth);
         match self {
             Statement::Return(ref exp) => {
-                print!("{indentation}'{parent_scope}:return ");
+                print!("{indentation}'{parent_scope}: return ");
                 exp.print();
                 println!();
             }
@@ -254,8 +254,8 @@ pub fn print_for_decl(decl: &Declaration) {
     let mut opt_decl = Some(decl);
     while let Some(decl) = opt_decl {
         match decl {
-            ast::Declaration::Declare(ident, opt_exp, opt_decl2) => {
-                print!("int {ident}");
+            ast::Declaration::Declare(var, opt_exp, opt_decl2) => {
+                print!("{var_type} {name} = ", var_type = var.type_(), name = var.name());
                 if let Some(exp) = opt_exp {
                     print!(" ");
                     exp.print();
