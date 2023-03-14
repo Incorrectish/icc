@@ -130,7 +130,7 @@ impl AsmGenerator {
                 // if let Some(last) = assembly.
                 match assembly.last() {
                     Some(last) if last.command() == "ret" => {
-                        assembly.add_instr_two_before_end(self.remove_scope(child_scope));
+                        // assembly.add_instr_two_before_end(self.remove_scope(child_scope));
                     }
                     _ => {
                         assembly.add_instructions(self.remove_scope(child_scope));
@@ -177,7 +177,7 @@ impl AsmGenerator {
                     let constructed_assembly = Asm::new(
                         self.gen_expression(expression, parent_scope),
                         vec![
-                            AsmInstr::from("popq", "%rax"),
+                            // AsmInstr::from("popq", "%rax"),
                             AsmInstr::new("movq".into(), format!("%rax,{location}")),
                             AsmInstr::new("subq".into(), format!("${LONG_SIZE},%rsp")),
                         ],
@@ -226,8 +226,8 @@ impl AsmGenerator {
         asm.add_instructions(stmt);
         let exp = self.gen_expression(expression, parent_scope);
         asm.add_instructions(exp);
-        asm.append_instruction("cmpq".to_string(), "$0,(%rsp)".to_string());
-        asm.append_instruction("popq".to_string(), "r9".to_string());
+        asm.append_instruction("cmpq".to_string(), "$0,%rax".to_string());
+        // asm.append_instruction("popq".to_string(), "%r9".to_string());
         // asm.append_instruction("xorq".to_string(), "%rax,%rax".to_string());
         // asm.append_instruction("sete".to_string(), "%al".to_string());
         asm.append_instruction("je".to_string(), end_of_while_name);
@@ -256,8 +256,8 @@ impl AsmGenerator {
         let mut asm = Asm::instruction(start_of_while_label, String::new());
         let exp = self.gen_expression(expression, parent_scope);
         asm.add_instructions(exp);
-        asm.append_instruction("cmpq".to_string(), "$0,(%rsp)".to_string());
-        asm.append_instruction("popq".to_string(), "r9".to_string());
+        asm.append_instruction("cmpq".to_string(), "$0,%rax".to_string());
+        // asm.append_instruction("popq".to_string(), "%r9".to_string());
         // asm.append_instruction("xorq".to_string(), "%rax,%rax".to_string());
         // asm.append_instruction("sete".to_string(), "%al".to_string());
         asm.append_instruction("je".to_string(), end_of_while_name);
@@ -307,9 +307,10 @@ impl AsmGenerator {
             ast::Statement::For(optional_exp, exp1, exp2, body) => {
                 // same as for decl generally, except the very first part
                 let mut asm: Asm = if let Some(exp) = optional_exp {
-                    let mut assembly = self.gen_expression(exp, parent_scope);
-                    assembly.append_instruction("popq".to_string(), "r9".to_string());
-                    assembly
+                    // let mut assembly = self.gen_expression(exp, parent_scope);
+                    // assembly.append_instruction("popq".to_string(), "%r9".to_string());
+                    // assembly
+                    self.gen_expression(exp, parent_scope)
                 } else {
                     Asm::default()
                 };
@@ -317,12 +318,19 @@ impl AsmGenerator {
                 asm
             }
             ast::Statement::Return(expression) => {
+                let Some(size_of_current_stack_frame) = self.symbol_table.top_of_stack(parent_scope) else {
+                    fail!("Error, scope `{parent_scope}` doesn't exist");
+                };
+                // let size_of_current_stack_frame = dbg!(size_of_current_stack_frame);
+                // println!("Symbol table: \n{:#?}", self.symbol_table);
                 let constructed_assembly = Asm::new(
                     self.gen_expression(expression, parent_scope),
                     vec![
                         /* AsmInstr::from("popq", "%rbx"),  */
-                        AsmInstr::from("popq", "%rax"),
+                        // AsmInstr::from("popq", "%rax"),
                         // AsmInstr::new("cdq".to_string(), String::new()),
+                        AsmInstr::new("#".into(), format!("${size_of_current_stack_frame} being returned")),
+                        AsmInstr::new("addq".into(), format!("${size_of_current_stack_frame},%rsp")),
                         AsmInstr::from("popq", "%rbp"),
                         AsmInstr::from("ret", ""),
                     ],
@@ -333,19 +341,24 @@ impl AsmGenerator {
                 // let mut asm = self.gen_expression(expression);
                 // asm.add_instructions(Asm::instruction("popq".into(), "%rbx".into()));
                 // asm
-                let mut assembly = self.gen_expression(expression, parent_scope);
-                assembly.append_instruction("popq".to_string(), "r9".to_string());
-                assembly
+                // let mut assembly = self.gen_expression(expression, parent_scope);
+                self.gen_expression(expression, parent_scope)
+                // assembly.append_instruction("popq".to_string(), "%r9".to_string());
+                // assembly
             }
             ast::Statement::Conditional(expression, if_children, potential_else_children) => {
-                let mut asm = self.gen_expression(expression, parent_scope);
+                let mut asm = Asm::default();    
+                asm.append_instruction("#".into(), format!("start of if"));
+                asm.add_instructions(self.gen_expression(expression, parent_scope));
+                // let mut asm = self.gen_expression(expression, parent_scope);
                 let (else_, else_label) = self.gen_new_label();
                 asm.add_instructions(Asm::instructions(vec![
-                    AsmInstr::from("popq", "%rax"),
+                    // AsmInstr::from("popq", "%rax"),
                     AsmInstr::from("cmpq", "$0,%rax"),
                     AsmInstr::new("je".into(), else_.clone()),
                 ]));
                 // for statement in if_children {
+                asm.append_instruction("#".into(), format!("start of conditional body"));
                 asm.add_instructions(self.gen_statement(
                     *if_children,
                     parent_scope,
@@ -355,11 +368,13 @@ impl AsmGenerator {
                 if let Some(else_children) = *potential_else_children {
                     // TODO: get labels, else, and endofif
                     let (endif_, endif_label) = self.gen_new_label();
+                    asm.append_instruction("#".into(), format!("start of else"));
                     asm.add_instructions(Asm::instructions(vec![
                         AsmInstr::new("jmp".into(), endif_),
                         AsmInstr::new(else_label, String::new()),
                     ]));
                     // for statement in else_children {
+                    asm.append_instruction("#".into(), format!("start of else body"));
                     asm.add_instructions(self.gen_statement(
                         else_children,
                         parent_scope,
@@ -425,7 +440,7 @@ impl AsmGenerator {
         let context = Context::new(after_for_name, end_for_name.clone());
         if !matches!(exp, Expression::NullExp) {
             asm.add_instructions(self.gen_expression(exp, parent_scope));
-            asm.append_instruction("popq".to_string(), "%rax".to_string());
+            // asm.append_instruction("popq".to_string(), "%rax".to_string());
             asm.append_instruction("cmpq".to_string(), "$0,%rax".to_string());
             asm.append_instruction("je".to_string(), end_for_name);
         }
@@ -433,7 +448,7 @@ impl AsmGenerator {
         asm.append_instruction(after_for_label, String::new());
         if let Some(expr) = optional_exp {
             asm.add_instructions(self.gen_expression(expr, parent_scope));
-            asm.append_instruction("popq".to_string(), "r9".to_string());
+            // asm.append_instruction("popq".to_string(), "%r9".to_string());
         }
         asm.append_instruction("jmp".to_string(), begin_for_name);
         asm.append_instruction(end_for_label, String::new());
@@ -494,7 +509,7 @@ impl AsmGenerator {
         match expr {
             ast::Expression::NullExp => Asm::default(),
             ast::Expression::Constant(int) => {
-                Asm::instruction("pushq".to_string(), format!("${int}"))
+                Asm::instruction("movq".to_string(), format!("${int},%rax"))
             }
             ast::Expression::UnaryOp(operator, expression) => match operator {
                 _ => {
@@ -517,9 +532,9 @@ impl AsmGenerator {
                     Asm::new(
                         asm,
                         vec![
-                            AsmInstr::from("popq", "%rax"),
+                            // AsmInstr::from("popq", "%rax"),
                             AsmInstr::new("movq".into(), format!("%rax,{location}")),
-                            AsmInstr::from("pushq", "%rax"),
+                            // AsmInstr::from("pushq", "%rax"),
                         ],
                     )
                 } else {
@@ -533,8 +548,8 @@ impl AsmGenerator {
             ast::Expression::ReferenceVariable(name) => {
                 let optional_location = self.symbol_table.get(&name, parent_scope);
                 if let Some(location) = optional_location {
-                    Asm::instruction("pushq".into(), location.clone())
-                    // Asm::instruction("movq".into(), format!("{location},%rax"))
+                    // Asm::instruction("pushq".into(), location.clone())
+                    Asm::instruction("movq".into(), format!("{location},%rax"))
                 } else {
                     fail!(
                         "Variable \"{}\" in scope '{} referenced but not declared",
@@ -547,7 +562,7 @@ impl AsmGenerator {
                 let (else_name, else_label) = self.gen_new_label();
                 let (endternary_name, endternary_label) = self.gen_new_label();
                 let mut asm = self.gen_expression(*expression1, parent_scope);
-                asm.append_instruction("popq".into(), "%rax".into());
+                // asm.append_instruction("popq".into(), "%rax".into());
                 asm.append_instruction("cmpq".into(), "$0,%rax".into());
                 asm.append_instruction("je".into(), else_name);
                 asm.add_instructions(self.gen_expression(*expression2, parent_scope));
@@ -558,37 +573,48 @@ impl AsmGenerator {
                 asm
             }
             ast::Expression::FunctionCall(name, arguments) => {
-                if !self.function_table.contains_key(&name) {
+                if !self.function_table.contains_key(&name) && !self.function_prototype_table.contains_key(&name) {
                     fail!("Function `{name}` referenced but not created");
-                } else if (arguments.len() != self.function_table[&name].len()) {
-                    // TODO make better error here: which vars are required etc
-                    fail!(
-                        "Function `{name}` requires {} arguments, but got {} arguments",
-                        self.function_table[&name].len(),
-                        arguments.len()
-                    );
-                } else {
-                    // function has been created and has the right amount of arguments
-                    let mut asm = Asm::default();
-                    // let dealloc_amt = 8 * (arguments.len() - 6);
-                    let dealloc_amt = 8 * (arguments.len());
-                    for argument in arguments.into_iter().rev() {
-                        asm.add_instructions(self.gen_expression(argument, parent_scope));
-                        // TODO get arguments in registers instead of stack
-                        // suppossedly this isn't needed because each result is pushed onto the
-                        // stack... we will see
-                        // asm.append_instruction("pushq".to_string(), "%rax".to_string());
-                    }
-                    asm.append_instruction("call".to_string(), name);
-                    // TODO when variables can have a differing size, change this into a for loop
-                    // to calculate the amount to deallocate
-                    asm.append_instruction("addq".to_string(), format!("${dealloc_amt},%rsp"));
-                    // return values of functions are generally stored in rax, so push them to the
-                    // top of the stack in order to ensure they are in the right place, maintain
-                    // top of stack invariant so to speak
-                    asm.append_instruction("pushq".to_string(), format!("%rax"));
-                    asm
                 }
+                if let Some(prototype) = self.function_prototype_table.get(&name) {
+                    if arguments.len() != prototype.len() {
+                        // TODO make better error here: which vars are required etc
+                        fail!(
+                            "Function `{name}` requires {} arguments, but got {} arguments",
+                            prototype.len(),
+                            arguments.len()
+                            );
+                    }
+                } else if let Some(args) = self.function_table.get(&name) {
+                    if arguments.len() != args.len() {
+                        // TODO make better error here: which vars are required etc
+                        fail!(
+                            "Function `{name}` requires {} arguments, but got {} arguments",
+                            args.len(),
+                            arguments.len()
+                            );
+                    }
+                }
+                // function has been created and has the right amount of arguments
+                let mut asm = Asm::default();
+                // let dealloc_amt = 8 * (arguments.len() - 6);
+                let dealloc_amt = 8 * (arguments.len());
+                for argument in arguments.into_iter()/* .rev() */ {
+                    asm.add_instructions(self.gen_expression(argument, parent_scope));
+                    // TODO get arguments in registers instead of stack
+                    // suppossedly this isn't needed because each result is pushed onto the
+                    // stack... we will see
+                    asm.append_instruction("pushq".to_string(), "%rax".to_string());
+                }
+                asm.append_instruction("call".to_string(), name);
+                // TODO when variables can have a differing size, change this into a for loop
+                // to calculate the amount to deallocate
+                asm.append_instruction("addq".to_string(), format!("${dealloc_amt},%rsp"));
+                // return values of functions are generally stored in rax, so push them to the
+                // top of the stack in order to ensure they are in the right place, maintain
+                // top of stack invariant so to speak
+                // asm.append_instruction("pushq".to_string(), format!("%rax"));
+                asm
             }
         }
     }
@@ -604,26 +630,30 @@ impl AsmGenerator {
             BinaryOperator::LogicalOr => {
                 let mut left_exp = self.gen_expression(*left_expr, parent_scope);
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                // left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
                 let (label1_name, label1) = self.gen_new_label();
                 let (label2_name, label2) = self.gen_new_label();
                 left_exp.append_instruction("je".into(), label1_name);
-                left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
+                // left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
+                left_exp.append_instruction("movq".into(), "$1,%rax".into());
                 left_exp.append_instruction("jmp".into(), label2_name);
                 left_exp.append_instruction(label1, String::new());
                 let right_exp = self.gen_expression(*right_expr, parent_scope);
                 left_exp.add_instructions(right_exp);
-                left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                // left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
                 left_exp.append_instruction("movq".into(), "$0,%rax".into());
                 left_exp.append_instruction("setne".into(), "%al".into());
-                left_exp.append_instruction("movq".into(), "%rax,(%rsp)".into());
+                // left_exp.append_instruction("movq".into(), "%rax,(%rsp)".into());
                 left_exp.append_instruction(label2, "".into());
                 return left_exp;
             }
             BinaryOperator::LogicalAnd => {
                 let mut left_exp = self.gen_expression(*left_expr, parent_scope);
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                // left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
                 let (label1_name, label1) = self.gen_new_label();
                 let (label2_name, label2) = self.gen_new_label();
                 left_exp.append_instruction("jne".into(), label1_name);
@@ -631,10 +661,11 @@ impl AsmGenerator {
                 left_exp.append_instruction(label1, "".into());
                 let right_exp = self.gen_expression(*right_expr, parent_scope);
                 left_exp.add_instructions(right_exp);
-                left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                // left_exp.append_instruction("cmpq".into(), "$0,(%rsp)".into());
+                left_exp.append_instruction("cmpq".into(), "$0,%rax".into());
                 left_exp.append_instruction("movq".into(), "$0,%rax".into());
                 left_exp.append_instruction("setne".into(), "%al".into());
-                left_exp.append_instruction("movq".into(), "%rax,(%rsp)".into());
+                // left_exp.append_instruction("movq".into(), "%rax,(%rsp)".into());
                 left_exp.append_instruction(label2, "".into());
                 return left_exp;
             }
@@ -642,22 +673,25 @@ impl AsmGenerator {
         }
 
         let mut left_exp = self.gen_expression(*left_expr, parent_scope);
+        left_exp.append_instruction("pushq".into(), "%rax".into());
         // Left expression is in %rbx, right will be in %rax
         let right_exp = self.gen_expression(*right_expr, parent_scope);
         left_exp.add_instructions(right_exp);
+        left_exp.append_instruction("movq".into(), "%rax,%rcx".into());
+        left_exp.append_instruction("popq".into(), "%rax".into());
         // Moves left expression to %rax, and right to %rbx
         // todo!("This may not work because rbx may be overwritten when the right expression is itself an expressino and not a constant value");
-        left_exp.append_instruction("popq".into(), "%rbx".into());
+        // left_exp.append_instruction("popq".into(), "%rbx".into());
         let binop = Self::binary_operation(&binary_operator);
         match binary_operator {
             BinaryOperator::Divide => {
                 // we want to divide left by right expression, so we must exchange the contents of rbx
                 // and rax
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction("popq".into(), "%rax".into());
+                // left_exp.append_instruction("popq".into(), "%rax".into());
                 left_exp.append_instruction("cqo".into(), String::new());
-                left_exp.append_instruction(binop, "%rbx".into());
-                left_exp.append_instruction("pushq".into(), "%rax".into());
+                left_exp.append_instruction(binop, "%rcx".into());
+                // left_exp.append_instruction("pushq".into(), "%rax".into());
                 // left_exp.append_instruction("pushq".into(), "%rax".into());
             }
             BinaryOperator::Multiply => {
@@ -665,24 +699,27 @@ impl AsmGenerator {
                 // see that that is fixed
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
                 // left_exp.append_instruction("popq".into(), "%rax".into());
-                left_exp.append_instruction(binop, "(%rsp),%rbx".into());
+                // left_exp.append_instruction(binop, "(%rsp),%rbx".into());
+                left_exp.append_instruction(binop, "rcx,rax".into());
                 // TODO, part of the result will be in rdx
-                left_exp.append_instruction("movq".into(), "%rbx,(%rsp)".into());
+                // left_exp.append_instruction("movq".into(), "%rbx,(%rsp)".into());
                 // left_exp.append_instruction("pushq".into(), "%rax".into());
             }
             BinaryOperator::Modulo => {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
-                left_exp.append_instruction("popq".into(), "%rax".into());
+                // left_exp.append_instruction("popq".into(), "%rax".into());
                 left_exp.append_instruction("cqo".into(), String::new());
-                left_exp.append_instruction(binop, "%rbx".into());
-                left_exp.append_instruction("pushq".into(), "%rdx".into());
+                left_exp.append_instruction(binop, "%rcx".into());
+                left_exp.append_instruction("movq".into(), "%rdx,%rax".into());
+                // left_exp.append_instruction("pushq".into(), "%rdx".into());
                 // left_exp.append_instruction("pushq".into(), "%rax".into());
 
             }
             BinaryOperator::BitwiseLeftShift | BinaryOperator::BitwiseRightShift => {
                 // TODO: maybe clear the rcx register?
                 // left_exp.append_instruction("popq".into(), "%rcx".into());
-                left_exp.append_instruction(binop, "%rbx,(%rsp)".into());
+                // left_exp.append_instruction(binop, "%rbx,(%rsp)".into());
+                left_exp.append_instruction(binop, "%rcx,%rax".into());
             }
             // The following might need to be fixed
             // => {
@@ -701,10 +738,10 @@ impl AsmGenerator {
             | BinaryOperator::Less => {
                 // left_exp.append_instruction("popq".into(), "%rbx".into());
                 // left_exp.append_instruction("popq".into(), "%rax".into());
-                left_exp.append_instruction("cmpq".into(), "%rbx,(%rsp)".into());
+                left_exp.append_instruction("cmpq".into(), "%rcx,%rax".into());
                 left_exp.append_instruction("movq".into(), "$0,%rax".into());
                 left_exp.append_instruction(binop, "%al".into());
-                left_exp.append_instruction("pushq".into(), "%rax".into());
+                // left_exp.append_instruction("pushq".into(), "%rax".into());
             }
             BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => unreachable!(),
             _ => {
@@ -713,7 +750,7 @@ impl AsmGenerator {
                 // into a register, and then operate on them and write them back to the stack,
                 // minimizing push/pop instructions
                 // left_exp.append_instruction("popq".into(), "%rax".into());
-                left_exp.append_instruction(binop, "%rbx,(%rsp)".into());
+                left_exp.append_instruction(binop, "%rcx,%rax".into());
                 // format!(
                 //     "{left_exp}\n{right_exp}\npopl %eax\npopl %ebx\n{binop} %ebx, %eax\npushl %eax"
                 // )
@@ -750,15 +787,15 @@ impl AsmGenerator {
         // Note for all of these, rcx might be overwritten so in the future, might need to copy out the
         // values in rcx
         match operator {
-            ast::UnaryOperator::Negation => Asm::instructions(vec![AsmInstr::from("negq", "(%rsp)")]),
+            ast::UnaryOperator::Negation => Asm::instructions(vec![AsmInstr::from("negq", "%rax")]),
             ast::UnaryOperator::BitwiseComplement => {
-                Asm::instructions(vec![AsmInstr::from("notq", "(%rsp)")])
+                Asm::instructions(vec![AsmInstr::from("notq", "%rax")])
             }
             ast::UnaryOperator::LogicalNegation => Asm::instructions(vec![
-                AsmInstr::from("cmpq", "$0,(%rsp)"),
+                AsmInstr::from("cmpq", "$0,%rax"),
                 AsmInstr::from("movq", "$0,%rax"),
                 AsmInstr::from("sete", "%al"),
-                AsmInstr::from("movq", "%rax,(%rsp)"),
+                // AsmInstr::from("movq", "%rax,(%rsp)"),
             ]),
             ast::UnaryOperator::PostfixIncrement(name) => {
                 let location = self.symbol_table.get(&name, parent_scope).expect(&format!(
@@ -766,7 +803,8 @@ impl AsmGenerator {
                     name, parent_scope
                 ));
                 Asm::instructions(vec![
-                    AsmInstr::new("pushq".into(), format!("{location}")),
+                    // AsmInstr::new("pushq".into(), format!("{location}")),
+                    AsmInstr::new("movq".into(), format!("{location},%rax")),
                     AsmInstr::new("addq".into(), format!("$1,{location}")),
                 ])
             }
@@ -777,7 +815,8 @@ impl AsmGenerator {
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("addq".into(), format!("$1,{location}")),
-                    AsmInstr::new("pushq".into(), format!("{location}")),
+                    AsmInstr::new("movq".into(), format!("{location},%rax")),
+                    // AsmInstr::new("pushq".into(), format!("{location}")),
                 ])
             }
             ast::UnaryOperator::PrefixDecrement(name) => {
@@ -787,7 +826,8 @@ impl AsmGenerator {
                 ));
                 Asm::instructions(vec![
                     AsmInstr::new("subq".into(), format!("$1,{location}")),
-                    AsmInstr::new("pushq".into(), format!("{location}")),
+                    AsmInstr::new("movq".into(), format!("{location},%rax")),
+                    // AsmInstr::new("pushq".into(), format!("{location}")),
                 ])
             }
             ast::UnaryOperator::PostfixDecrement(name) => {
@@ -796,7 +836,8 @@ impl AsmGenerator {
                     name, parent_scope
                 ));
                 Asm::instructions(vec![
-                    AsmInstr::new("pushq".into(), format!("{location}")),
+                    // AsmInstr::new("pushq".into(), format!("{location}")),
+                    AsmInstr::new("movq".into(), format!("{location},%rax")),
                     AsmInstr::new("subq".into(), format!("$1,{location}")),
                 ])
             }

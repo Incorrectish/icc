@@ -6,3 +6,8 @@ fix this
 
 in addition this evaluates to 0??? fix also
 int a = sum(1, 2) - (sum(1, 2) / 2) * 2;
+
+I might have been dumb and refactored stuff to be on the top of the stack when I
+didn't have to, I could have left everything in rax and pushed for binary or
+ternary ops.. potentially refactor for the 3rd time to do this
+Must refactor again :(, segfaults :((((

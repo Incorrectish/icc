@@ -42,14 +42,20 @@ impl SymbolTable {
         }
     }
 
+    pub fn top_of_stack(&self, scope: u64) -> Option<u64> {
+        self.scope_to_top_of_stack.get(&scope).map(|&x| x)
+    }
+
     // DO NOT EVER CALL THIS FUNCTION EXCEPT TO CREATE FUNCTION ARGUMENTS. IT PURPOSELY DOESN'T
     // ALLOCATE SPACE AND USES ADRESSES THAT WILL NEVER WORK OTHERWISE. This function also will not
     // deallocate the arguments properly, the caller MUST do that
     pub fn create_function_arguments(&mut self, scope: u64, arguments: &Vec<String>) {
+        // let arguments = dbg!(arguments);
         let mut top_of_stack = 16;
         for argument in arguments.iter().rev() {
             self.scoped_variables_to_location
                 .insert((argument.clone(), scope), format!("{top_of_stack}(%rbp)"));
+            dbg!((argument, top_of_stack));
             top_of_stack += LONG_SIZE;
         }
     }
@@ -105,8 +111,8 @@ impl SymbolTable {
             // *self.size_of_scopes.get_mut(&curr_scope).expect("Scope '{curr_scope} doesn't have a top of stack") += size;
             // *self.scope_to_top_of_stack.get_mut(&curr_scope).expect("Scope '{curr_scope} doesn't have a size") += size;
         }
-        println!("symbol table: \n{:#?}", self.scoped_variables_to_location);
-        println!("symbol table: \n{:#?}", self.size_of_scopes);
+        // println!("symbol table: \n{:#?}", self.scoped_variables_to_location);
+        // println!("symbol table: \n{:#?}", self.size_of_scopes);
         new_location
     }
 
