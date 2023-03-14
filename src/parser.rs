@@ -42,7 +42,8 @@ impl Parser {
     fn parse_func(&mut self) -> Option<ast::FuncDecl> {
         let _ = self.lexer.peek()?; // returns none if there are no tokens left
         let token = self.lexer.next();
-        if !matches!(token, Some(Token::KeywordInt)) {
+        if !matches!(token, Some(Token::KeywordType(_))) {
+            todo!();
             self.lexer.print_line_with_caret();
             fail!("Needs int return type, got {token:?}");
         }
@@ -101,7 +102,8 @@ impl Parser {
     // gets all the arguments
     fn parse_arguments(&mut self) -> Vec<String> {
         let mut args = vec![];
-        while let Some(Token::KeywordInt) = self.lexer.peek() {
+        while let Some(Token::KeywordType(_)) = self.lexer.peek() {
+            todo!();
             // dbg!("hi");
             // self.lexer.print_line_with_caret();
             let _ = self.lexer.next();
@@ -136,7 +138,8 @@ impl Parser {
         // let token = self.lexer.next().expect("Invalid token sequence");
         let token = self.lexer.peek().expect("Invalid token sequence");
         match token {
-            Token::KeywordInt => {
+            Token::KeywordType(_) => {
+                todo!();
                 let _ = self.lexer.next();
                 self.lexer.peek();
                 let ret = Some(ast::BlockItem::Declaration(self.parse_declaration()));
@@ -168,7 +171,7 @@ impl Parser {
             Token::CloseBrace => None,
             Token::KeywordReturn => Some(self.parse_return_statement()),
             Token::KeywordIf => Some(self.parse_if_statement()),
-            Token::KeywordInt => fail("Statements cannot be declarations!".into()),
+            Token::KeywordType(_) => todo!()/* fail("Statements cannot be declarations!".into()) */,
             Token::Identifier(_)
             | Token::IntegerLiteral(_)
             | Token::PrefixDecrement(_)
@@ -264,7 +267,8 @@ impl Parser {
             fail!("Expected opening parentheses, got {open_paren:?}");
         }
         let potential_decl = self.lexer.peek();
-        if matches!(potential_decl, Some(Token::KeywordInt)) {
+        if matches!(potential_decl, Some(Token::KeywordType(_))) {
+            todo!();
             let _ = self.lexer.next();
             let declaration = self.parse_declaration();
             let expression = self.parse_expression();

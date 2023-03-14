@@ -1,10 +1,5 @@
 int main() {
-    int a = 0;
-    for (; ; ) {
-        a = a + 1;
-        if (a > 3)
-            break;
-    }
-
+    long a = 7;
+    int b = a;
     return a;
 }

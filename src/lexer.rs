@@ -1,6 +1,6 @@
 use crate::{
     fail,
-    token::{Token, IDENTIFIER_REGEX, INTEGER_LITERAL_REGEX},
+    token::{Token, IDENTIFIER_REGEX, INTEGER_LITERAL_REGEX, TYPES},
 };
 use std::mem;
 
@@ -85,7 +85,14 @@ impl Lexer {
     fn consume(&mut self) -> Option<Token> {
         let curr_substr = &mem::take(&mut self.curr_substr) as &str;
         match curr_substr {
-            "int" => Some(Token::KeywordInt),
+            _ if TYPES.contains(curr_substr) => {
+                // I can't use an if let guard, which is why I do this
+                // would use _ if let Some(&elem) = TYPES.get(curr_substr)
+                let elem = TYPES.get(curr_substr).unwrap();
+                // Keyword Int etc
+                Some(Token::KeywordType(elem))
+            }
+            // "int" => Some(Token::KeywordInt),
             "return" => Some(Token::KeywordReturn),
             "else" => Some(Token::KeywordElse),
             "if" => Some(Token::KeywordIf),
@@ -98,6 +105,11 @@ impl Lexer {
                 Some(Token::IntegerLiteral(curr_substr.to_string()))
             }
             _ if IDENTIFIER_REGEX.is_match(curr_substr) => {
+                // todo!();
+                // let var_type = match self.prev_token {
+                //     Some(Token::KeywordType(var_type)) => var_type,
+                //     _ => {self.print_line_with_caret(); fail!("Variable `{curr_substr}` must be preceded with a type")}
+                // };
                 Some(Token::Identifier(curr_substr.to_string()))
             }
             _ => {
@@ -136,6 +148,7 @@ impl Lexer {
                     self.curr_pos += 1;
                     match self.prev_token {
                         Some(Token::Identifier(ref name)) => {
+                            // todo!()
                             Some(Token::PostfixDecrement(name.clone()))
                         }
                         _ => {
