@@ -111,7 +111,7 @@ impl SymbolTable {
 
     pub fn allocate(
         &mut self,
-        var: Var, 
+        var: &Var, 
         curr_scope: u64,
     ) -> String {
         let size = TYPE_SIZES[var.type_()];
@@ -125,7 +125,6 @@ impl SymbolTable {
             // TODO SO MANY BUGS maybe
             self.scoped_variables_to_location
                 .insert((var.name().clone(), curr_scope), new_location.clone());
-            todo!();
             self.scoped_variables_to_type
                 .insert((var.name().clone(), curr_scope), var.type_());
             // println!("symbol table is {:?}", self.symbol_table);
