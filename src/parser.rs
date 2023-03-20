@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, BinaryOperator},
+    ast::{self, BinaryOperator, UnaryOperator},
     lexer::Lexer,
     token::Token, variable::Var,
 };
@@ -163,638 +163,640 @@ impl Parser {
     //  int b = 7;
     // }
     // it will return Some(declare(a, 5)), Some(declare(a, 5)), None
-    fn parse_statement(&mut self) -> Option<ast::Statement> {
-        // let token = self.lexer.next().expect("Invalid token sequence");
-        let token = self.lexer.peek().expect("Invalid token sequence");
-        match token {
-            Token::CloseBrace => None,
-            Token::KeywordReturn => Some(self.parse_return_statement()),
-            Token::KeywordIf => Some(self.parse_if_statement()),
-            Token::KeywordType(_) => todo!()/* fail("Statements cannot be declarations!".into()) */,
-            Token::Identifier(_)
+fn parse_statement(&mut self) -> Option<ast::Statement> {
+    // let token = self.lexer.next().expect("Invalid token sequence");
+    let token = self.lexer.peek().expect("Invalid token sequence");
+    match token {
+        Token::CloseBrace => None,
+        Token::KeywordReturn => Some(self.parse_return_statement()),
+        Token::KeywordIf => Some(self.parse_if_statement()),
+        Token::KeywordType(_) => todo!()/* fail("Statements cannot be declarations!".into()) */,
+        Token::Identifier(_)
             | Token::IntegerLiteral(_)
             | Token::PrefixDecrement(_)
             | Token::PrefixIncrement(_) => Some(self.parse_expression_statement()),
-            Token::OpenBrace => {
-                let _ = self.lexer.next();
-                let mut block_statements = vec![];
-                while let Some(statements) = self.parse_block_item() {
-                    block_statements.push(statements);
-                }
-                let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
-                Some(ast::Statement::Block(block_statements))
-            }
-            Token::KeywordBreak => {
-                let _ = self.lexer.next();
-                let next = self.lexer.next();
-                if !matches!(next, Some(Token::Semicolon)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Missing semicolon, got {token:?} instead");
-                }
-                Some(ast::Statement::Break)
-            }
-            Token::KeywordFor => self.parse_for_loop(),
-            Token::KeywordDo => {
-                let _ = self.lexer.next();
-                let statement = self
-                    .parse_statement()
-                    .expect("Expected statement after `do`");
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::KeywordWhile)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected while, got {token:?}");
-                }
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::OpenParen)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected obening parentheses, got {token:?}");
-                }
-                let expression = self.parse_expression();
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::CloseParen)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected closing parentheses, got {token:?}");
-                }
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::Semicolon)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected semicolon, got {token:?}");
-                }
-                Some(ast::Statement::Do(Box::new(statement), expression))
-            }
-            Token::KeywordWhile => {
-                let _ = self.lexer.next();
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::OpenParen)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected opening parentheses, got {token:?}");
-                }
-                let expression = self.parse_expression();
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::CloseParen)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected closing parentheses, got {token:?}");
-                }
-                let statement = self
-                    .parse_statement()
-                    .expect("Expected body, got closing curly brace");
-                Some(ast::Statement::While(expression, Box::new(statement)))
-            }
-            Token::Semicolon => {
-                let _ = self.lexer.next();
-                Some(ast::Statement::Expression(ast::Expression::NullExp))
-                // Token::Semicolon => todo!("Null statement"),
-            }
-            Token::KeywordContinue => {
-                let _ = self.lexer.next();
-                let next = self.lexer.next();
-                if !matches!(next, Some(Token::Semicolon)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Missing semicolon, got {token:?} instead");
-                }
-                Some(ast::Statement::Continue)
-            }
-            _ => panic!("Is this the token: {token:?}?"),
-        }
-    }
-
-    fn parse_for_loop(&mut self) -> Option<ast::Statement> {
-        let _ = self.lexer.next();
-        let open_paren = self.lexer.next();
-        if !matches!(open_paren, Some(Token::OpenParen)) {
-            self.lexer.print_line_with_caret();
-            fail!("Expected opening parentheses, got {open_paren:?}");
-        }
-        let potential_decl = self.lexer.peek();
-        if let Some(Token::KeywordType(var_type)) = potential_decl {
+        Token::OpenBrace => {
             let _ = self.lexer.next();
-            let declaration = self.parse_declaration(var_type);
+            let mut block_statements = vec![];
+            while let Some(statements) = self.parse_block_item() {
+                block_statements.push(statements);
+            }
+            let Token::CloseBrace = self.lexer.next().expect("Needs closing brace") else {unreachable!()};
+            Some(ast::Statement::Block(block_statements))
+        }
+        Token::KeywordBreak => {
+            let _ = self.lexer.next();
+            let next = self.lexer.next();
+            if !matches!(next, Some(Token::Semicolon)) {
+                self.lexer.print_line_with_caret();
+                fail!("Missing semicolon, got {token:?} instead");
+            }
+            Some(ast::Statement::Break)
+        }
+        Token::KeywordFor => self.parse_for_loop(),
+        Token::KeywordDo => {
+            let _ = self.lexer.next();
+            let statement = self
+                .parse_statement()
+                .expect("Expected statement after `do`");
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::KeywordWhile)) {
+                self.lexer.print_line_with_caret();
+                fail!("Expected while, got {token:?}");
+            }
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::OpenParen)) {
+                self.lexer.print_line_with_caret();
+                fail!("Expected obening parentheses, got {token:?}");
+            }
             let expression = self.parse_expression();
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::CloseParen)) {
+                self.lexer.print_line_with_caret();
+                fail!("Expected closing parentheses, got {token:?}");
+            }
             let token = self.lexer.next();
             if !matches!(token, Some(Token::Semicolon)) {
                 self.lexer.print_line_with_caret();
-                fail!("Expected semicolon, got {token:?}")
+                fail!("Expected semicolon, got {token:?}");
             }
-            let token = self.lexer.peek();
-            if let Some(Token::CloseParen) = token {
-                let _ = self.lexer.next();
-                let statement = self
-                    .parse_statement()
-                    .expect("For loop needs a statement succeeding it");
-                Some(ast::Statement::ForDecl(
-                    declaration,
-                    expression,
-                    None,
-                    Box::new(statement),
-                ))
-            } else {
-                let exp2 = self.parse_expression();
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::CloseParen)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected semicolon, got {token:?}")
-                }
-                let statement = self
-                    .parse_statement()
-                    .expect("For loop needs a statement succeeding it");
-                Some(ast::Statement::ForDecl(
-                    declaration,
-                    expression,
-                    Some(exp2),
-                    Box::new(statement),
-                ))
-            }
-        } else {
-            let exp1 = self.parse_expression();
+            Some(ast::Statement::Do(Box::new(statement), expression))
+        }
+        Token::KeywordWhile => {
+            let _ = self.lexer.next();
             let token = self.lexer.next();
-            if !matches!(token, Some(Token::Semicolon)) {
-            self.lexer.print_line_with_caret();
-                fail!("Expected semicolon, got {token:?}")
+            if !matches!(token, Some(Token::OpenParen)) {
+                self.lexer.print_line_with_caret();
+                fail!("Expected opening parentheses, got {token:?}");
             }
             let expression = self.parse_expression();
             let token = self.lexer.next();
-            if !matches!(token, Some(Token::Semicolon)) {
+            if !matches!(token, Some(Token::CloseParen)) {
+                self.lexer.print_line_with_caret();
+                fail!("Expected closing parentheses, got {token:?}");
+            }
+            let statement = self
+                .parse_statement()
+                .expect("Expected body, got closing curly brace");
+            Some(ast::Statement::While(expression, Box::new(statement)))
+        }
+        Token::Semicolon => {
+            let _ = self.lexer.next();
+            Some(ast::Statement::Expression(ast::Expression::NullExp))
+                // Token::Semicolon => todo!("Null statement"),
+        }
+        Token::KeywordContinue => {
+            let _ = self.lexer.next();
+            let next = self.lexer.next();
+            if !matches!(next, Some(Token::Semicolon)) {
+                self.lexer.print_line_with_caret();
+                fail!("Missing semicolon, got {token:?} instead");
+            }
+            Some(ast::Statement::Continue)
+        }
+        _ => panic!("Is this the token: {token:?}?"),
+    }
+}
+
+fn parse_for_loop(&mut self) -> Option<ast::Statement> {
+    let _ = self.lexer.next();
+    let open_paren = self.lexer.next();
+    if !matches!(open_paren, Some(Token::OpenParen)) {
+        self.lexer.print_line_with_caret();
+        fail!("Expected opening parentheses, got {open_paren:?}");
+    }
+    let potential_decl = self.lexer.peek();
+    if let Some(Token::KeywordType(var_type)) = potential_decl {
+        let _ = self.lexer.next();
+        let declaration = self.parse_declaration(var_type);
+        let expression = self.parse_expression();
+        let token = self.lexer.next();
+        if !matches!(token, Some(Token::Semicolon)) {
             self.lexer.print_line_with_caret();
+            fail!("Expected semicolon, got {token:?}")
+        }
+        let token = self.lexer.peek();
+        if let Some(Token::CloseParen) = token {
+            let _ = self.lexer.next();
+            let statement = self
+                .parse_statement()
+                .expect("For loop needs a statement succeeding it");
+            Some(ast::Statement::ForDecl(
+                    declaration,
+                    expression,
+                    None,
+                    Box::new(statement),
+                    ))
+        } else {
+            let exp2 = self.parse_expression();
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::CloseParen)) {
+                self.lexer.print_line_with_caret();
                 fail!("Expected semicolon, got {token:?}")
             }
-            let token = self.lexer.peek();
-            if let Some(Token::CloseParen) = token {
-                let _ = self.lexer.next();
-                let statement = self
-                    .parse_statement()
-                    .expect("For loop needs a statement succeeding it");
-                Some(ast::Statement::For(
+            let statement = self
+                .parse_statement()
+                .expect("For loop needs a statement succeeding it");
+            Some(ast::Statement::ForDecl(
+                    declaration,
+                    expression,
+                    Some(exp2),
+                    Box::new(statement),
+                    ))
+        }
+    } else {
+        let exp1 = self.parse_expression();
+        let token = self.lexer.next();
+        if !matches!(token, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
+            fail!("Expected semicolon, got {token:?}")
+        }
+        let expression = self.parse_expression();
+        let token = self.lexer.next();
+        if !matches!(token, Some(Token::Semicolon)) {
+            self.lexer.print_line_with_caret();
+            fail!("Expected semicolon, got {token:?}")
+        }
+        let token = self.lexer.peek();
+        if let Some(Token::CloseParen) = token {
+            let _ = self.lexer.next();
+            let statement = self
+                .parse_statement()
+                .expect("For loop needs a statement succeeding it");
+            Some(ast::Statement::For(
                     Some(exp1),
                     expression,
                     None,
                     Box::new(statement),
-                ))
-            } else {
-                let exp2 = self.parse_expression();
-                let token = self.lexer.next();
-                if !matches!(token, Some(Token::CloseParen)) {
-            self.lexer.print_line_with_caret();
-                    fail!("Expected closing parentheses, got {token:?}")
-                }
-                let statement = self
-                    .parse_statement()
-                    .expect("For loop needs a statement succeeding it");
-                Some(ast::Statement::For(
+                    ))
+        } else {
+            let exp2 = self.parse_expression();
+            let token = self.lexer.next();
+            if !matches!(token, Some(Token::CloseParen)) {
+                self.lexer.print_line_with_caret();
+                fail!("Expected closing parentheses, got {token:?}")
+            }
+            let statement = self
+                .parse_statement()
+                .expect("For loop needs a statement succeeding it");
+            Some(ast::Statement::For(
                     Some(exp1),
                     expression,
                     Some(exp2),
                     Box::new(statement),
-                ))
-            }
+                    ))
         }
     }
+}
 
-    fn parse_if_statement(&mut self) -> ast::Statement {
-        let Token::KeywordIf = self.lexer.next().expect("Should be if") else {
+fn parse_if_statement(&mut self) -> ast::Statement {
+    let Token::KeywordIf = self.lexer.next().expect("Should be if") else {
         unreachable!()
     };
-        let Token::OpenParen = self.lexer.next().expect("Needs opening parentheses around if condition") else {
-            self.lexer.print_line_with_caret();
+    let Token::OpenParen = self.lexer.next().expect("Needs opening parentheses around if condition") else {
+        self.lexer.print_line_with_caret();
         fail!("Needed opening parens around if");
     };
-        let expression = self.parse_expression();
-        let Token::CloseParen = self.lexer.next().expect("Needs closing parentheses around if condition") else {
-            self.lexer.print_line_with_caret();
+    let expression = self.parse_expression();
+    let Token::CloseParen = self.lexer.next().expect("Needs closing parentheses around if condition") else {
+        self.lexer.print_line_with_caret();
         fail!("Needed closing parens around if");
     };
-        let if_body = self
-            .parse_statement()
-            .expect("Body should not terminate with a curly brace");
-        let potential_else = self.lexer.peek();
-        let else_body = if let Some(Token::KeywordElse) = potential_else {
-            let _ = self.lexer.next();
-            self.parse_statement()
-        } else {
-            None
-        };
-        ast::Statement::Conditional(expression, Box::new(if_body), Box::new(else_body))
-    }
-    // fn parse_if_one_liner(&mut self, expression: Expression) -> ast::Statement {
-    //     let if_children_statement = self
-    //         .parse_statement()
-    //         .expect("Expected expression after if");
-    //     let else_token = self.lexer.peek().expect("This is invalid, there should be a curly brace or statement after the end of an if statement");
-    //     if matches!(else_token, Token::KeywordElse) {
-    //         let _ = self.lexer.next();
-    //         let potential_else_open_brace =
-    //             self.lexer.peek().expect("Else cannot be the last token :(");
-    //         if let Token::OpenBrace = potential_else_open_brace {
-    //             let _ = self.lexer.next();
-    //             let else_children_statements = self.parse_block_of_statements();
-    //             return ast::Statement::Conditional(
-    //                 expression,
-    //                 if_children_statement,
-    //                 Some(else_children_statements),
-    //             );
-    //         } else {
-    //             let else_children_statement = self
-    //                 .parse_statement()
-    //                 .expect("Expected statement after else");
-    //             ast::Statement::Conditional(
-    //                 expression,
-    //                 if_children_statement,
-    //                 Some(else_children_statement),
-    //             )
-    //         }
-    //     } else {
-    //         ast::Statement::Conditional(expression, if_children_statement, None)
-    //     }
-    // }
+    let if_body = self
+        .parse_statement()
+        .expect("Body should not terminate with a curly brace");
+    let potential_else = self.lexer.peek();
+    let else_body = if let Some(Token::KeywordElse) = potential_else {
+        let _ = self.lexer.next();
+        self.parse_statement()
+    } else {
+        None
+    };
+    ast::Statement::Conditional(expression, Box::new(if_body), Box::new(else_body))
+}
+// fn parse_if_one_liner(&mut self, expression: Expression) -> ast::Statement {
+//     let if_children_statement = self
+//         .parse_statement()
+//         .expect("Expected expression after if");
+//     let else_token = self.lexer.peek().expect("This is invalid, there should be a curly brace or statement after the end of an if statement");
+//     if matches!(else_token, Token::KeywordElse) {
+//         let _ = self.lexer.next();
+//         let potential_else_open_brace =
+//             self.lexer.peek().expect("Else cannot be the last token :(");
+//         if let Token::OpenBrace = potential_else_open_brace {
+//             let _ = self.lexer.next();
+//             let else_children_statements = self.parse_block_of_statements();
+//             return ast::Statement::Conditional(
+//                 expression,
+//                 if_children_statement,
+//                 Some(else_children_statements),
+//             );
+//         } else {
+//             let else_children_statement = self
+//                 .parse_statement()
+//                 .expect("Expected statement after else");
+//             ast::Statement::Conditional(
+//                 expression,
+//                 if_children_statement,
+//                 Some(else_children_statement),
+//             )
+//         }
+//     } else {
+//         ast::Statement::Conditional(expression, if_children_statement, None)
+//     }
+// }
 
-    // fn parse_if_curly_statement(&mut self, expression: Expression) -> ast::Statement {
-    //     let _ = self.lexer.next();
-    //     let if_children_statements = self.parse_block_of_statements();
-    //     let conditional_else_token = self.lexer.peek();
-    //     let Some(else_token) = conditional_else_token else {
-    //             fail!("Wtf is this token: {conditional_else_token:?}, and this lexer: {:?}", self.lexer.get_rest_of_input())
-    //         };
-    //     if !matches!(else_token, Token::KeywordElse) {
-    //         return ast::Statement::Conditional(expression, if_children_statements, None);
-    //     }
-    //
-    //     let _ = self.lexer.next();
-    //
-    //     let potential_else_open_brace =
-    //         self.lexer.peek().expect("Else cannot be the last token :(");
-    //     if let Token::OpenBrace = potential_else_open_brace {
-    //         let _ = self.lexer.next();
-    //         let else_children_statements = self.parse_block_of_statements();
-    //         return ast::Statement::Conditional(
-    //             expression,
-    //             if_children_statements,
-    //             Some(else_children_statements),
-    //         );
-    //     }
-    //
-    //     let else_children_statement = self
-    //         .parse_statement()
-    //         .expect("Expected statement after else");
-    //     ast::Statement::Conditional(
-    //         expression,
-    //         if_children_statements,
-    //         Some(else_children_statement),
-    //     )
-    // }
+// fn parse_if_curly_statement(&mut self, expression: Expression) -> ast::Statement {
+//     let _ = self.lexer.next();
+//     let if_children_statements = self.parse_block_of_statements();
+//     let conditional_else_token = self.lexer.peek();
+//     let Some(else_token) = conditional_else_token else {
+//             fail!("Wtf is this token: {conditional_else_token:?}, and this lexer: {:?}", self.lexer.get_rest_of_input())
+//         };
+//     if !matches!(else_token, Token::KeywordElse) {
+//         return ast::Statement::Conditional(expression, if_children_statements, None);
+//     }
+//
+//     let _ = self.lexer.next();
+//
+//     let potential_else_open_brace =
+//         self.lexer.peek().expect("Else cannot be the last token :(");
+//     if let Token::OpenBrace = potential_else_open_brace {
+//         let _ = self.lexer.next();
+//         let else_children_statements = self.parse_block_of_statements();
+//         return ast::Statement::Conditional(
+//             expression,
+//             if_children_statements,
+//             Some(else_children_statements),
+//         );
+//     }
+//
+//     let else_children_statement = self
+//         .parse_statement()
+//         .expect("Expected statement after else");
+//     ast::Statement::Conditional(
+//         expression,
+//         if_children_statements,
+//         Some(else_children_statement),
+//     )
+// }
 
-    fn parse_expression_statement(&mut self) -> ast::Statement {
-        let statement = self.parse_expression();
-        let token = self.lexer.next().expect("Missing semicolon");
-        if !matches!(token, Token::Semicolon) {
-            self.lexer.print_line_with_caret();
-            fail!(
-                "Missing semicolon on line {}, got {token:?}",
-                self.lexer.line_number()
+fn parse_expression_statement(&mut self) -> ast::Statement {
+    let statement = self.parse_expression();
+    let token = self.lexer.next().expect("Missing semicolon");
+    if !matches!(token, Token::Semicolon) {
+        self.lexer.print_line_with_caret();
+        fail!(
+            "Missing semicolon on line {}, got {token:?}",
+            self.lexer.line_number()
             );
-        }
-        ast::Statement::Expression(statement)
     }
+    ast::Statement::Expression(statement)
+}
 
-    fn parse_return_statement(&mut self) -> ast::Statement {
-        if !matches!(
-            self.lexer
-                .next()
-                .expect("This should always be a return keyword"),
-            Token::KeywordReturn
+fn parse_return_statement(&mut self) -> ast::Statement {
+    if !matches!(
+        self.lexer
+        .next()
+        .expect("This should always be a return keyword"),
+        Token::KeywordReturn
         ) {
-            fail("This should always be the return keyword".into());
-        }
-        let exp = self.parse_expression();
-        println!("{exp:#?}");
-        let statement = ast::Statement::Return(exp);
-        let token = self.lexer.next().expect("Invalid token sequence");
-        if !matches!(token, Token::Semicolon) {
-            self.lexer.print_line_with_caret();
-            fail!("Needs semicolon, got {token:?}");
-        }
-        statement
+        fail("This should always be the return keyword".into());
     }
+    let exp = self.parse_expression();
+    // println!("{exp:#?}");
+    // if matches!(exp, ast::Expression::NullExp) {
+    //     self.lexer.print_line_with_caret();
+    //     fail!("Return statement must return a value");
+    // }
+    let statement = ast::Statement::Return(exp);
+    let token = self.lexer.next().expect("Invalid token sequence");
+    if !matches!(token, Token::Semicolon) {
+        self.lexer.print_line_with_caret();
+        fail!("Needs semicolon, got {token:?}");
+    }
+    statement
+}
 
-    fn parse_declaration(&mut self, var_type: &'static str) -> ast::Declaration {
-        let token = self.lexer.next().expect("Invalid token sequence");
-        if let Token::Identifier(variable_name) = token {
-            let token = self.lexer.peek().expect("Invalid token sequence");
-            let (expression, next_assignment) = match token {
-                Token::Semicolon => (None, None),
-                Token::Assign => {
+fn parse_declaration(&mut self, var_type: &'static str) -> ast::Declaration {
+    let token = self.lexer.next().expect("Invalid token sequence");
+    if let Token::Identifier(variable_name) = token {
+        let token = self.lexer.peek().expect("Invalid token sequence");
+        let (expression, next_assignment) = match token {
+            Token::Semicolon => (None, None),
+            Token::Assign => {
+                let _ = self.lexer.next();
+                let exp = Some(self.parse_expression());
+                let next_tok = self.lexer.peek();
+                let next_decl = if let Some(Token::Comma) = next_tok {
                     let _ = self.lexer.next();
-                    let exp = Some(self.parse_expression());
-                    let next_tok = self.lexer.peek();
-                    let next_decl = if let Some(Token::Comma) = next_tok {
-                        let _ = self.lexer.next();
-                        Some(self.parse_declaration(var_type))
-                    } else if let Some(Token::Semicolon) = next_tok {
-                        let _semicolon = self.lexer.next();
-                        // let see = self.lexer.next();
-                        // dbg!(see);
-                        None
-                    } else {
-                        self.lexer.print_line_with_caret();
-                        fail!("Expected semicolon or comma")
-                    };
-                    (exp, next_decl)
-                },
-                Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_declaration(var_type)))},
-                _ => {
-            self.lexer.print_line_with_caret();
-                    fail!(
+                    Some(self.parse_declaration(var_type))
+                } else if let Some(Token::Semicolon) = next_tok {
+                    let _semicolon = self.lexer.next();
+                    // let see = self.lexer.next();
+                    // dbg!(see);
+                    None
+                } else {
+                    self.lexer.print_line_with_caret();
+                    fail!("Expected semicolon or comma")
+                };
+                (exp, next_decl)
+            },
+            Token::Comma => {let _ = self.lexer.next(); (None, Some(self.parse_declaration(var_type)))},
+            _ => {
+                self.lexer.print_line_with_caret();
+                fail!(
                     "Expected assignment operator[=] or end of statement[;], got {token:?}, ast Node until now = :?"
-                )},
-            };
-            ast::Declaration::Declare(Var::new(variable_name, var_type), expression, Box::new(next_assignment))
-        } else {
-            self.lexer.print_line_with_caret();
-            fail!("Expected variable name, got {token:?}");
-        }
+                    )},
+        };
+        ast::Declaration::Declare(Var::new(variable_name, var_type), expression, Box::new(next_assignment))
+    } else {
+        self.lexer.print_line_with_caret();
+        fail!("Expected variable name, got {token:?}");
     }
+}
 
-    // fn parse_expression(&mut self) -> ast::Expression {
-    //     let term_one = self.parse_ternary();
-    //     let operation = self.lexer.peek();
-    //     if !matches!(operation, Some(Token::Question)) {
-    //         return term_one;
-    //     }
-    //     let _ = self.lexer.next();
-    //     let mut term_two = self.parse_ternary();
-    //     let operation = self.lexer.peek();
-    //     if matches!(operation, Some(Token::Question)) {
-    //         let _ = self.lexer.next();
-    //         term_two = self.parse_partial_ternary(term_two);
-    //         let operation_two = self.lexer.peek();
-    //         // potential while loop
-    //     } else if matches!(operation, Some(Token::Colon)) {
-    //         // TODO:
-    //         let _ = self.lexer.next();
-    //         let term_three = self.parse_ternary();
-    //         ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
-    //     } else {
-    //         term_one.print();
-    //         println!();
-    //         term_two.print();
-    //         println!();
-    //         fail!(
-    //         "Ternary must seperate conditional expressions with `:`. Instead got {operation:?}"
-    //     );
-    //     }
-    // }
-    //
-    // fn parse_partial_ternary(&mut self, term_one: ast::Expression) -> ast::Expression {
-    //     let term_two = self.parse_expression();
-    //     let operation = self.lexer.peek();
-    //     if !matches!(operation, Some(Token::Colon)) {
-    //         fail!("Ternary must seperate conditional expressions with `:`. Instead got {operation:?}");
-    //     }
-    //     let _ = self.lexer.next();
-    //     let term_three = self.parse_expression();
-    //     ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
-    // }
+// fn parse_expression(&mut self) -> ast::Expression {
+//     let term_one = self.parse_ternary();
+//     let operation = self.lexer.peek();
+//     if !matches!(operation, Some(Token::Question)) {
+//         return term_one;
+//     }
+//     let _ = self.lexer.next();
+//     let mut term_two = self.parse_ternary();
+//     let operation = self.lexer.peek();
+//     if matches!(operation, Some(Token::Question)) {
+//         let _ = self.lexer.next();
+//         term_two = self.parse_partial_ternary(term_two);
+//         let operation_two = self.lexer.peek();
+//         // potential while loop
+//     } else if matches!(operation, Some(Token::Colon)) {
+//         // TODO:
+//         let _ = self.lexer.next();
+//         let term_three = self.parse_ternary();
+//         ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
+//     } else {
+//         term_one.print();
+//         println!();
+//         term_two.print();
+//         println!();
+//         fail!(
+//         "Ternary must seperate conditional expressions with `:`. Instead got {operation:?}"
+//     );
+//     }
+// }
+//
+// fn parse_partial_ternary(&mut self, term_one: ast::Expression) -> ast::Expression {
+//     let term_two = self.parse_expression();
+//     let operation = self.lexer.peek();
+//     if !matches!(operation, Some(Token::Colon)) {
+//         fail!("Ternary must seperate conditional expressions with `:`. Instead got {operation:?}");
+//     }
+//     let _ = self.lexer.next();
+//     let term_three = self.parse_expression();
+//     ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
+// }
 
-    // TODO: Error messages, error messages
-    fn parse_expression(&mut self) -> ast::Expression {
-        // TODO:
+// TODO: Error messages, error messages
+fn parse_expression(&mut self) -> ast::Expression {
+    // TODO:
+    let next = self.lexer.peek();
+    match next {
+        Some(Token::Semicolon) => ast::Expression::NullExp,
+        _ => self.parse_conditional_expr()
+    }
+}
+
+// parses after the '(', for example, parses `1, 2)` in add(1, 2)
+fn parse_function_call(&mut self, name: String) -> ast::Expression {
+    let mut args = vec![];
+    loop {
+        if let Some(Token::CloseParen) = self.lexer.peek() {
+            let _ = self.lexer.next();
+            return ast::Expression::FunctionCall(name, args);
+        }
+        let expression = self.parse_expression();
+        args.push(expression);
         let next = self.lexer.peek();
         match next {
-            Some(Token::Semicolon) => ast::Expression::NullExp,
-            _ => self.parse_conditional_expr()
-        }
-    }
-
-    fn parse_function_call(&mut self, name: String) -> ast::Expression {
-        let mut args = vec![];
-        loop {
-            if let Some(Token::CloseParen) = self.lexer.peek() {
-                    let _ = self.lexer.next();
-                return ast::Expression::FunctionCall(name, args);
+            Some(Token::Comma) => {
+                let _ = self.lexer.next();
             }
-            let expression = self.parse_expression();
-            args.push(expression);
-            let next = self.lexer.peek();
-            match next {
-                Some(Token::Comma) => {
-                    let _ = self.lexer.next();
-                }
-                Some(Token::CloseParen) => {
-                    let _ = self.lexer.next();
-                    break;
-                }
-                _ => {
-                    self.lexer.print_line_with_caret();
-                    fail!("Expected `;` or `)`, found {next:?}");
-                }
+            Some(Token::CloseParen) => {
+                let _ = self.lexer.next();
+                break;
+            }
+            _ => {
+                self.lexer.print_line_with_caret();
+                fail!("Expected `;` or `)`, found {next:?}");
             }
         }
-        ast::Expression::FunctionCall(name, args)
     }
+    ast::Expression::FunctionCall(name, args)
+}
 
-    fn parse_conditional_expr(&mut self) -> ast::Expression {
-        let term_one = self.parse_logical_or_expr();
+fn parse_conditional_expr(&mut self) -> ast::Expression {
+    let term_one = self.parse_logical_or_expr();
+    let token = self.lexer.peek();
+    if matches!(token, Some(Token::Question)) {
+        let _ = self.lexer.next();
+        let term_two = self.parse_expression();
         let token = self.lexer.peek();
-        if matches!(token, Some(Token::Question)) {
-            let _ = self.lexer.next();
-            let term_two = self.parse_expression();
-            let token = self.lexer.peek();
-            if !matches!(token, Some(Token::Colon)) {
+        if !matches!(token, Some(Token::Colon)) {
             self.lexer.print_line_with_caret();
-                fail!("Expected `:` after ternary expression, found {token:?}");
-            }
-            let _ = self.lexer.next();
-            let term_three = self.parse_conditional_expr();
-            ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
-        } else {
-            term_one
+            fail!("Expected `:` after ternary expression, found {token:?}");
         }
+        let _ = self.lexer.next();
+        let term_three = self.parse_conditional_expr();
+        ast::Expression::Ternary(Box::new(term_one), Box::new(term_two), Box::new(term_three))
+    } else {
+        term_one
     }
+}
 
-    fn parse_logical_or_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_logical_and_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::LogicalOr)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_logical_and_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_logical_or_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_logical_and_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::LogicalOr)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_logical_and_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_logical_and_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_or_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::LogicalAnd)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_or_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_logical_and_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_bit_or_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::LogicalAnd)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_bit_or_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_bit_or_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_xor_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::BitwiseOr)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_xor_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_bit_or_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_bit_xor_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::BitwiseOr)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_bit_xor_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_bit_xor_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_and_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::Xor)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_and_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_bit_xor_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_bit_and_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::Xor)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_bit_and_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_bit_and_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_equality_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::BitwiseAnd)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_equality_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_bit_and_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_equality_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::BitwiseAnd)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_equality_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_equality_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_relational_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::EqualTo) | Some(Token::NotEqual)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_relational_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_equality_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_relational_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::EqualTo) | Some(Token::NotEqual)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_relational_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_relational_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_bit_shift_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::LessThanOrEqualTo)
-                    | Some(Token::GreaterThanOrEqualTo)
-                    | Some(Token::LessThan)
-                    | Some(Token::GreaterThan)
+fn parse_relational_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_bit_shift_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(
+            operation,
+            Some(Token::LessThanOrEqualTo)
+            | Some(Token::GreaterThanOrEqualTo)
+            | Some(Token::LessThan)
+            | Some(Token::GreaterThan)
             ) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_bit_shift_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_bit_shift_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_bit_shift_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_additive_expr();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::BitwiseLeftShift) | Some(Token::BitwiseRightShift)
+fn parse_bit_shift_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_additive_expr();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(
+            operation,
+            Some(Token::BitwiseLeftShift) | Some(Token::BitwiseRightShift)
             ) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_additive_expr();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_additive_expr();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_additive_expr(&mut self) -> ast::Expression {
-        let mut term = self.parse_term();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(operation, Some(Token::Minus) | Some(Token::Add)) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_term();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+fn parse_additive_expr(&mut self) -> ast::Expression {
+    let mut term = self.parse_term();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(operation, Some(Token::Minus) | Some(Token::Add)) {
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_term();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_term(&mut self) -> ast::Expression {
-        let mut term = self.parse_factor();
-        loop {
-            let operation = self.lexer.peek();
-            if !matches!(
-                operation,
-                Some(Token::Multiply) | Some(Token::Divide) | Some(Token::Modulo)
+fn parse_term(&mut self) -> ast::Expression {
+    let mut term = self.parse_factor();
+    loop {
+        let operation = self.lexer.peek();
+        if !matches!(
+            operation,
+            Some(Token::Multiply) | Some(Token::Divide) | Some(Token::Modulo)
             ) {
-                return term;
-            }
-            let operation = Self::parse_to_op(self.lexer.next().unwrap());
-            let next_term = self.parse_factor();
-            term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
+            return term;
         }
+        let operation = Self::parse_to_op(self.lexer.next().unwrap());
+        let next_term = self.parse_factor();
+        term = ast::Expression::BinaryOp(operation, Box::new(term), Box::new(next_term));
     }
+}
 
-    fn parse_factor(&mut self) -> ast::Expression {
-        let token = self.lexer.next();
-        match token {
+fn parse_factor(&mut self) -> ast::Expression {
+    let token = self.lexer.next();
+    match token {
         Some(Token::IntegerLiteral(int_literal)) => {
-            ast::Expression::Constant(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is"))
+            ast::Expression::Constant(crate::expression::Constant::Int(int_literal.parse().expect("This is guaranteed to be a valid integer because it can only be turned into a token if it is")))
         }
         Some(Token::BitwiseComplement) => {
             // let next_token = self.lexer.peek();
-            let exp = self.parse_expression();
-            ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(exp))
-            // match next_token {
-            //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::ReferenceVariable(other_name)))},
-            //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-            //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression())),
-            //     _ => {
-            // self.lexer.print_line_with_caret();
-            //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
-            // }
+            self.parse_unary_expression(ast::UnaryOperator::BitwiseComplement)
+                // match next_token {
+                //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::BitwiseComplement, Box::new(self.parse_expression())),
+                //     _ => {
+                // self.lexer.print_line_with_caret();
+                //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+                // }
         },
         Some(Token::LogicalNot) => {
-            let exp = self.parse_expression();
-            ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(exp))
-            // let next_token = self.lexer.peek();
-            // match next_token {
-            //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
-            //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-            //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression())),
-            //     _ => {
-            // self.lexer.print_line_with_caret();
-            //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
-            // }
+            self.parse_unary_expression(ast::UnaryOperator::LogicalNegation)
+                // let next_token = self.lexer.peek();
+                // match next_token {
+                //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(self.parse_expression())),
+                //     _ => {
+                // self.lexer.print_line_with_caret();
+                //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+                // }
         },
         Some(Token::Minus) => {
-            let exp = self.parse_expression();
-            ast::Expression::UnaryOp(ast::UnaryOperator::LogicalNegation, Box::new(exp))
-            // let next_token = self.lexer.peek();
-            // match next_token {
-            //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
-            //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
-            //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression())),
-            //     _ => {
-            // self.lexer.print_line_with_caret();
-            //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
-            // }
+            self.parse_unary_expression(ast::UnaryOperator::Negation)
+                // let next_token = self.lexer.peek();
+                // match next_token {
+                //     Some(Token::Identifier(other_name)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::ReferenceVariable(other_name)))},
+                //     Some(Token::IntegerLiteral(int)) => { let _ = self.lexer.next(); ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(ast::Expression::Constant(int.parse().unwrap()))) },
+                //     Some(Token::OpenParen) => ast::Expression::UnaryOp(ast::UnaryOperator::Negation, Box::new(self.parse_expression())),
+                //     _ => {
+                // self.lexer.print_line_with_caret();
+                //         fail!("Unary operator must be succeeded by an expression, found {next_token:?} instead")},
+                // }
         },
         Some(Token::PrefixDecrement(name)) => {
             let next_token = self.lexer.peek();
@@ -841,7 +843,7 @@ impl Parser {
             let expression = self.parse_expression();
             let next_token = self.lexer.next();
             if !matches!(next_token, Some(Token::CloseParen)) {
-            self.lexer.print_line_with_caret();
+                self.lexer.print_line_with_caret();
                 fail!("Token must be an closing parentheses, instead got {next_token:?}");
             }
             expression
@@ -880,29 +882,111 @@ impl Parser {
             self.lexer.print_line_with_caret();
             fail!("Token must be an expression, instead got {token:?}")},
     }
-    }
+}
 
-    fn parse_to_op(operation: Token) -> ast::BinaryOperator {
-        match operation {
-            Token::Add => ast::BinaryOperator::Add,
-            Token::Minus => ast::BinaryOperator::Minus,
-            Token::Multiply => ast::BinaryOperator::Multiply,
-            Token::Divide => ast::BinaryOperator::Divide,
-            Token::Modulo => ast::BinaryOperator::Modulo,
-            Token::BitwiseAnd => ast::BinaryOperator::BitwiseOr,
-            Token::BitwiseOr => ast::BinaryOperator::BitwiseAnd,
-            Token::Xor => ast::BinaryOperator::Xor,
-            Token::BitwiseRightShift => ast::BinaryOperator::BitwiseRightShift,
-            Token::BitwiseLeftShift => ast::BinaryOperator::BitwiseLeftShift,
-            Token::GreaterThan => ast::BinaryOperator::Greater,
-            Token::GreaterThanOrEqualTo => ast::BinaryOperator::GreaterEq,
-            Token::LessThan => ast::BinaryOperator::Less,
-            Token::LessThanOrEqualTo => ast::BinaryOperator::LessEq,
-            Token::EqualTo => ast::BinaryOperator::Equal,
-            Token::NotEqual => ast::BinaryOperator::NotEqual,
-            Token::LogicalOr => ast::BinaryOperator::LogicalOr,
-            Token::LogicalAnd => ast::BinaryOperator::LogicalAnd,
-            _ => unreachable!(),
+fn parse_unary_expression(&mut self, operator: UnaryOperator) -> ast::Expression {
+    let next = self.lexer.peek();
+    let expr = match next {
+        Some(Token::OpenParen) => self.parse_expression(),
+        Some(Token::Identifier(name)) => {
+            let _ = self.lexer.next();
+            let peek = self.lexer.peek();
+            match peek {
+                Some(Token::OpenParen) => {
+                    let _ = self.lexer.next();
+                    self.parse_function_call(name)
+                } 
+                _ => ast::Expression::ReferenceVariable(name) 
+            }
         }
+        Some(Token::IntegerLiteral(int)) => {
+            let _ = self.lexer.next();
+            ast::Expression::Constant(crate::expression::Constant::Int(int.parse().expect("Guaranteed to be a valid integer")))
+        }
+        Some(Token::LogicalNot) => {
+            let _ = self.lexer.next();
+            self.parse_unary_expression(ast::UnaryOperator::LogicalNegation)
+        }
+        Some(Token::Minus) => {
+            let _ = self.lexer.next();
+            self.parse_unary_expression(ast::UnaryOperator::Negation)
+        }
+        Some(Token::BitwiseComplement) => {
+            let _ = self.lexer.next();
+            self.parse_unary_expression(ast::UnaryOperator::BitwiseComplement)
+        }
+        Some(Token::PrefixDecrement(name)) => {
+            let _ = self.lexer.next();
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => {
+                    let _ = self.lexer.next(); 
+                    let peek = self.lexer.peek();
+                    match peek {
+                        Some(Token::OpenParen) => {
+                            self.lexer.print_line_with_caret();
+                            fail!("Cannot decrement a temporary(result of a function)")
+                        }
+                        _ => {}
+                    }
+                    ast::Expression::UnaryOp(ast::UnaryOperator::PrefixDecrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))
+                },
+                _ => {
+                    self.lexer.print_line_with_caret();
+                    fail!("Prefix decrement must be succeeded by a variable reference, found {next_token:?} instead")},
+            }
+        },
+        Some(Token::PrefixIncrement(name)) => {
+            let _ = self.lexer.next();
+            let next_token = self.lexer.peek();
+            match next_token {
+                Some(Token::Identifier(other_name)) => {
+                    let _ = self.lexer.next(); 
+                    let peek = self.lexer.peek();
+                    match peek {
+                        Some(Token::OpenParen) => {
+                            self.lexer.print_line_with_caret();
+                            fail!("Cannot increment a temporary(result of a function)")
+                        }
+                        _ => {}
+                    }
+                    ast::Expression::UnaryOp(ast::UnaryOperator::PrefixIncrement(name), Box::new(ast::Expression::ReferenceVariable(other_name)))
+                },
+                _ => {
+                    self.lexer.print_line_with_caret();
+                    fail!("Prefix decrement must be succeeded by a variable reference, found {next_token:?} instead")},
+            }
+
+        },
+        _ => {
+            self.lexer.print_line_with_caret();
+            fail!("Cannot apply {operator:?} to {next:?}")
+        }
+    };
+    ast::Expression::UnaryOp(operator, Box::new(expr))
+}
+
+fn parse_to_op(operation: Token) -> ast::BinaryOperator {
+    match operation {
+        Token::Add => ast::BinaryOperator::Add,
+        Token::Minus => ast::BinaryOperator::Minus,
+        Token::Multiply => ast::BinaryOperator::Multiply,
+        Token::Divide => ast::BinaryOperator::Divide,
+        Token::Modulo => ast::BinaryOperator::Modulo,
+        Token::BitwiseAnd => ast::BinaryOperator::BitwiseOr,
+        Token::BitwiseOr => ast::BinaryOperator::BitwiseAnd,
+        Token::Xor => ast::BinaryOperator::Xor,
+        Token::BitwiseRightShift => ast::BinaryOperator::BitwiseRightShift,
+        Token::BitwiseLeftShift => ast::BinaryOperator::BitwiseLeftShift,
+        Token::GreaterThan => ast::BinaryOperator::Greater,
+        Token::GreaterThanOrEqualTo => ast::BinaryOperator::GreaterEq,
+        Token::LessThan => ast::BinaryOperator::Less,
+        Token::LessThanOrEqualTo => ast::BinaryOperator::LessEq,
+        Token::EqualTo => ast::BinaryOperator::Equal,
+        Token::NotEqual => ast::BinaryOperator::NotEqual,
+        Token::LogicalOr => ast::BinaryOperator::LogicalOr,
+        Token::LogicalAnd => ast::BinaryOperator::LogicalAnd,
+        _ => unreachable!(),
     }
+}
 }

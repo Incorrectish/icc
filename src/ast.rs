@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::{ast, variable::Var};
+use crate::{ast, variable::Var, expression::Constant};
 
 // Indentation for pretty printing, made a constant so size can be easily changed
 pub const INDENT: &str = "    ";
@@ -47,7 +47,7 @@ pub enum UnaryOperator {
 
 #[derive(Debug)]
 pub enum Expression {
-    Constant(i32),
+    Constant(Constant),
     UnaryOp(UnaryOperator, Box<Expression>),
     BinaryOp(BinaryOperator, Box<Expression>, Box<Expression>),
     Assign(String, Box<Expression>),
@@ -273,7 +273,7 @@ impl Expression {
     pub fn print(&self) {
         match self {
             Self::NullExp => print!(""),
-            Expression::Constant(int) => print!("int<{int}>"),
+            Expression::Constant(int) => print!("<{int:?}>"),
             Expression::UnaryOp(operator, expression) => {
                 if matches!(
                     operator,

@@ -1,12 +1,12 @@
 use std::{collections::VecDeque, fs, io::Write, mem, path::Path};
 
 #[repr(transparent)]
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Asm {
     instructions: VecDeque<AsmInstr>,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct AsmInstr {
     command: String,
     arguments: String,
@@ -37,6 +37,10 @@ impl AsmInstr {
         &self.command
     }
 
+    // pub fn comment(&self) -> &str {
+    //     &((&self.arguments)[self.arguments.find("#")..self.arguments.len() - 1])
+    // }
+
     pub fn print(&self) {
         print!("{} {}", self.command, self.arguments);
     }
@@ -45,7 +49,7 @@ impl AsmInstr {
 impl Default for Asm {
     fn default() -> Self {
         Asm {
-            instructions: VecDeque::new(),
+            instructions: VecDeque::default(),
         }
     }
 }
@@ -139,6 +143,16 @@ impl Asm {
         Ok(())
     }
 
+    // pub fn optimize_bin_ops_helper(&mut self, pointer: &mut usize) {
+    //     if 
+    // }
+    //
+    // pub fn optimize_bin_ops(&mut self) {
+    //     for index in 0..self.instructions.len() {
+    //         if self.instructions[index].is_comment()
+    //     }
+    // }
+
     // TODO: two potential optimizations, check if there is something like push, mov, pop, that can
     // be optimized to two moves
     // In addition, if you see a movq ${int},{register}
@@ -155,6 +169,14 @@ impl Asm {
 
     pub fn append_instruction(&mut self, command: String, arguments: String) {
         self.instructions.push_back(AsmInstr { command, arguments })
+    }
+
+    pub fn add_comment(&mut self, comment: String) {
+        self.instructions.push_back(AsmInstr { command: String::from("#"), arguments: comment })
+    }
+
+    pub fn add_label(&mut self, label: String) {
+        self.instructions.push_back(AsmInstr { command: label, arguments: String::new() })
     }
 
     #[allow(unused)]

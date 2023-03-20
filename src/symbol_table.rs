@@ -57,6 +57,11 @@ impl SymbolTable {
         }
     }
 
+    // This is guaranteed to succeed if the the location succeeded
+    pub fn type_of_var(&self, name: &String, scope: u64) -> Option<&'static str> {
+        self.scoped_variables_to_type.get(&(name.clone(), scope)).map(|s| *s)
+    }
+
     pub fn top_of_stack(&self, scope: u64) -> Option<u64> {
         self.scope_to_top_of_stack.get(&scope).map(|&x| x)
     }
@@ -68,6 +73,7 @@ impl SymbolTable {
         // let arguments = dbg!(arguments);
         let mut top_of_stack = 16;
         for argument in arguments.iter().rev() {
+            // TODO: this might have a problem
             let name = argument.name();
             let type_ = argument.type_();
             self.scoped_variables_to_location
@@ -141,14 +147,18 @@ impl SymbolTable {
         self.scoped_variables_to_location.remove(key);
     }
 
-    pub fn get(&self, name: &String, scope: u64) -> Option<&String> {
+    // returns (location, type)
+    pub fn get(&self, name: &String, scope: u64) -> Option<(&String, &'static str)> {
         let mut key = (name.clone(), 0u64);
         let mut parent = Some(scope);
         while let Some(curr_scope) = parent {
             key.1 = curr_scope;
-            let value = self.scoped_variables_to_location.get(&key);
-            if value.is_some() {
-                return value;
+            let potential_value = self.scoped_variables_to_location.get(&key);
+            let potential_type = self.scoped_variables_to_type.get(&key);
+            if let Some(value) = potential_value {
+                if let Some(type_) = potential_type {
+                    return Some((value, *type_));
+                }
             }
             parent = *self
                 .parents

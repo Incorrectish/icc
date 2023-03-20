@@ -13,6 +13,7 @@ mod symbol_table;
 mod token;
 mod context;
 mod variable;
+mod expression;
 
 fn main() {
     // Command args contain the binary directory relative path as the first argument, so the second
