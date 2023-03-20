@@ -179,7 +179,7 @@ impl AsmGenerator {
         match declaration {
             ast::Declaration::Declare(var, optional_expression, optional_child_declaration) => {
                 let size = TYPE_SIZES[var.type_()];
-                let (register, suffix) = Self::gen_register(var.type_());
+                let (register, suffix) = Self::gen_register_a(var.type_());
                 let mut declaration_assembly = if let Some(expression) = optional_expression {
                     let location = self.symbol_table.allocate(&var, parent_scope);
                     let expression_type = self.gen_expression(expression, parent_scope);
@@ -265,7 +265,7 @@ impl AsmGenerator {
                 }
             }
             ExpType::Type(mut asm, type_) => {
-                let (register, suffix) = Self::gen_register(type_);
+                let (register, suffix) = Self::gen_register_a(type_);
                 // TODO
                 // asm.add_instructions(exp);
                 asm.append_instruction(format!("cmp{suffix}"), format!("$0,%{register}"));
@@ -309,7 +309,7 @@ impl AsmGenerator {
                 }
             }
             ExpType::Type(mut asm, type_) => {
-                let (register, suffix) = Self::gen_register(type_);
+                let (register, suffix) = Self::gen_register_a(type_);
                 // asm.add_instructions(exp);
                 asm.append_instruction(format!("cmp{suffix}"), format!("$0,%{register}"));
                 asm.append_instruction("je".to_string(), end_of_while_name);
@@ -433,7 +433,7 @@ impl AsmGenerator {
                 let exp_type = self.gen_expression(expression, parent_scope);
                 match exp_type {
                     ExpType::Type(exp_asm, type_) => {
-                        let (register, suffix) = Self::gen_register(type_);
+                        let (register, suffix) = Self::gen_register_a(type_);
 
                         // these instruction were for the expression
                         asm.add_instructions(exp_asm);
@@ -547,7 +547,7 @@ impl AsmGenerator {
                 ExpType::Type(inner_asm, exp_type) => {
                     // let inner_asm = dbg!(inner_asm);
                     asm.add_instructions(inner_asm);
-                    let (register, suffix) = Self::gen_register(exp_type);
+                    let (register, suffix) = Self::gen_register_a(exp_type);
                     asm.append_instruction(format!("cmp{suffix}"), format!("$0,%{register}"));
                     asm.append_instruction("je".to_string(), end_for_name);
                 }
@@ -663,7 +663,7 @@ impl AsmGenerator {
                 if let Some((location, var_type)) = optional_information {
                     match exp_type {
                         ExpType::Type(mut asm, type_) => {
-                            let (register, suffix) = Self::gen_register(type_);
+                            let (register, suffix) = Self::gen_register_a(type_);
                             // TODO: this probably doesn't work, look at this bullshit later
                             asm.append_instruction(
                                 format!("mov{suffix}"),
@@ -675,7 +675,7 @@ impl AsmGenerator {
                             ExpType::Type(asm, type_)
                         }
                         ExpType::Constant(constant) => {
-                            let (register, suffix) = Self::gen_register(var_type);
+                            let (register, suffix) = Self::gen_register_a(var_type);
                             let args = match constant {
                                 Constant::Int(int) => format!("${int}"),
                             };
@@ -698,7 +698,7 @@ impl AsmGenerator {
             ast::Expression::ReferenceVariable(name) => {
                 let optional_location = self.symbol_table.get(&name, parent_scope);
                 if let Some((location, type_)) = optional_location {
-                    let (register, suffix) = Self::gen_register(type_);
+                    let (register, suffix) = Self::gen_register_a(type_);
                     // Asm::instruction("pushq".into(), location.clone())
                     ExpType::Type(
                         Asm::instruction(format!("mov{suffix}"), format!("{location},%{register}")),
@@ -744,7 +744,7 @@ impl AsmGenerator {
                     ExpType::Type(mut asm, type_) => {
                         // asm.append_instruction("popq".into(), "%rax".into());
                         // TODO look tomorrow, midnight brain
-                        let (register, suffix) = Self::gen_register(type_);
+                        let (register, suffix) = Self::gen_register_a(type_);
                         asm.append_instruction(format!("cmp{suffix}"), format!("$0,%{register}"));
                         asm.append_instruction("je".into(), else_name);
                         let left_expression = self.gen_expression(*expression2, parent_scope);
@@ -837,7 +837,7 @@ impl AsmGenerator {
                             }
                             asm.add_instructions(expression);
                             let size = TYPE_SIZES[type_];
-                            let (register, suffix) = Self::gen_register(type_);
+                            let (register, suffix) = Self::gen_register_a(type_);
                             asm.append_instruction(format!("subq"), format!("${size},%rsp"));
                             asm.append_instruction(
                                 format!("mov{suffix}"),
@@ -847,7 +847,7 @@ impl AsmGenerator {
                         }
                         ExpType::Constant(constant) => {
                             let size = TYPE_SIZES[function_argument_type];
-                            let (_, suffix) = Self::gen_register(function_argument_type);
+                            let (_, suffix) = Self::gen_register_a(function_argument_type);
                             asm.append_instruction(format!("subq"), format!("${size},%rsp"));
                             let value = match constant {
                                 Constant::Int(int) => format!("${int}"),
@@ -917,26 +917,35 @@ impl AsmGenerator {
                 }
                 // TODO: the following will work for all input sizes, but might want to refactor to
                 // use eax, ecx etc
-                left_asm.append_instruction("push".into(), "%rax".into());
+                let (register_a, suffix_a) = Self::gen_register_a(left_type);
+                let (register_c, suffix_c) = Self::gen_register_c(left_type);
+                let register_sizes = TYPE_SIZES[left_type]; 
+
+                // left_asm.append_instruction("push".into(), "%rax".into());
+                left_asm.append_instruction("subq".into(), format!("${register_sizes},%rsp"));
+                left_asm.append_instruction(format!("mov{suffix_a}"), format!("%{register_a},(%rsp)"));
                 left_asm.add_instructions(right_asm);
-                left_asm.append_instruction("mov".into(), "%rax,%rcx".into());
-                left_asm.append_instruction("pop".into(), "%rax".into());
+                left_asm.append_instruction(format!("mov{suffix_c}"), format!("%{register_a},%{register_c}"));
+                left_asm.append_instruction(format!("mov{suffix_a}"), format!("(%rsp),%{register_a}"));
+                left_asm.append_instruction("addq".into(), format!("${register_sizes},%rsp"));
                 // let (register, suffix) = Self::gen_register(left_type);
                 // temporary :: TODO: make gen register work with rax, rcx,
-                let binop = Self::binary_operation(&binary_operator, 'q' /* This should be suffix, but rcx doesn't work with gen register for now, only rax*/);
+                let binop = Self::binary_operation(&binary_operator, suffix_a /* This should be suffix, but rcx doesn't work with gen register for now, only rax*/);
                 match binary_operator {
                     BinaryOperator::Divide => {
+                        // TODO: division might not work because the upper bits won't be elimated
+                        // for 32 bit math
                         left_asm.append_instruction("cqo".into(), String::new());
                         left_asm.append_instruction(binop, "%rcx".into());
                     }
                     BinaryOperator::Multiply => {
-                        left_asm.append_instruction(binop, "%rcx,%rax".into());
+                        left_asm.append_instruction(binop, format!("%{register_c},%{register_a}"));
                         // TODO, part of the result will be in rdx
                     }
                     BinaryOperator::Modulo => {
                         left_asm.append_instruction("cqo".into(), String::new());
                         left_asm.append_instruction(binop, "%rcx".into());
-                        left_asm.append_instruction("mov".into(), "%rdx,%rax".into());
+                        left_asm.append_instruction("movq".into(), "%rdx,%rax".into());
                     }
                     // BinaryOperator::BitwiseLeftShift | BinaryOperator::BitwiseRightShift => {
                     //     left_asm.append_instruction(binop, "%rcx,%rax".into());
@@ -947,13 +956,13 @@ impl AsmGenerator {
                     | BinaryOperator::Greater
                     | BinaryOperator::LessEq
                     | BinaryOperator::Less => {
-                        left_asm.append_instruction("cmp".into(), "%rcx,%rax".into());
-                        left_asm.append_instruction("mov".into(), "$0,%rax".into());
+                        left_asm.append_instruction(format!("cmp{suffix_c}"), format!("%{register_c},%{register_a}"));
+                        left_asm.append_instruction("movq".into(), "$0,%rax".into());
                         left_asm.append_instruction(binop, "%al".into());
                     }
                     BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => unreachable!(),
                     _ => {
-                        left_asm.append_instruction(binop, "%rcx,%rax".into());
+                        left_asm.append_instruction(binop, format!("%{register_c},%{register_a}"));
                     }
                 }
                 ExpType::Type(left_asm, left_type)
@@ -967,12 +976,15 @@ impl AsmGenerator {
         type_: &'static str,
         mut expr_asm: Asm,
     ) -> ExpType {
-        let (register, suffix) = Self::gen_register(type_);
+        // let (register, suffix) = Self::gen_register_a(type_);
         // TODO: generify this code at some point
         let exp1 = match constant {
             Constant::Int(i) => format!("${i}"),
         };
-        let binop = Self::binary_operation(&binary_operator, suffix);
+        let (register_a, suffix_a) = Self::gen_register_a(type_);
+        let (register_c, suffix_c) = Self::gen_register_c(type_);
+        let register_sizes = TYPE_SIZES[type_]; 
+        let binop = Self::binary_operation(&binary_operator, suffix_a);
         match binary_operator {
             BinaryOperator::Equal
                 | BinaryOperator::NotEqual
@@ -989,11 +1001,12 @@ impl AsmGenerator {
     setl %al
  * %al is 1 in this case, which means cmpq rax rcx compares rcx to rax
  */
-                    expr_asm.append_instruction("cmp".into(), format!("{exp1},%rax"));
+                    expr_asm.append_instruction(format!("cmp{suffix_a}"), format!("{exp1},%{register_a}"));
                     expr_asm.append_instruction("mov".into(), "$0,%rax".into());
                     expr_asm.append_instruction(binop, "%al".into());
                 }
             BinaryOperator::Divide => {
+                // Divide is still rax, but this is a TODO: potential bug
                 expr_asm.append_instruction("movq".into(), format!("%rax,%rcx"));
                 expr_asm.append_instruction("movq".into(), format!("{exp1},%rax"));
                 expr_asm.append_instruction("cqo".into(), String::new());
@@ -1009,7 +1022,7 @@ impl AsmGenerator {
             _ => {
                 expr_asm.append_instruction(
                     format!("{binop}"),
-                    format!("{exp1},%{register}"),
+                    format!("{exp1},%{register_a}"),
                     );
             }
         }
@@ -1025,12 +1038,14 @@ impl AsmGenerator {
         mut expr_asm: Asm,
     ) -> ExpType {
         // TODO
-        let (register, suffix) = Self::gen_register(type_);
+        let (register_a, suffix_a) = Self::gen_register_a(type_);
+        let (register_c, suffix_c) = Self::gen_register_c(type_);
+        let register_sizes = TYPE_SIZES[type_]; 
         // TODO: generify this code at some point
         let exp1 = match constant {
             Constant::Int(i) => format!("${i}"),
         };
-        let binop = Self::binary_operation(&binary_operator, suffix);
+        let binop = Self::binary_operation(&binary_operator, suffix_a);
         match binary_operator {
             BinaryOperator::Equal
                 | BinaryOperator::NotEqual
@@ -1038,11 +1053,12 @@ impl AsmGenerator {
                 | BinaryOperator::Greater
                 | BinaryOperator::LessEq
                 | BinaryOperator::Less => {
-                    expr_asm.append_instruction("cmp".into(), format!("{exp1},%rax"));
+                    expr_asm.append_instruction(format!("cmp{suffix_a}"), format!("{exp1},%{register_a}"));
                     expr_asm.append_instruction("mov".into(), "$0,%rax".into());
                     expr_asm.append_instruction(binop, "%al".into());
                 }
             BinaryOperator::Divide => {
+                // TODO divide still has the same problems as before
                 expr_asm.append_instruction("cqo".into(), String::new());
                 expr_asm.append_instruction("movq".into(), format!("{exp1},%rcx"));
                 expr_asm.append_instruction(binop, format!("%rcx"));
@@ -1056,7 +1072,7 @@ impl AsmGenerator {
             _ => {
                 expr_asm.append_instruction(
                     format!("{binop}"),
-                    format!("{exp1},%{register}"),
+                    format!("{exp1},%{register_a}"),
                     );
             }
         }
@@ -1079,7 +1095,7 @@ impl AsmGenerator {
                 // if left_type != "bool" {
                 //     fail!("Cannot perform a logical or operation on `{left_type}`, mut be on type `bool`")
                 // }
-                let (register, suffix) = Self::gen_register(left_type);
+                let (register, suffix) = Self::gen_register_a(left_type);
                 left_exp.append_instruction(format!("cmp{suffix}"), format!("$0,%{register}"));
                 left_exp.append_instruction("je".into(), second_condition);
                 // left_exp.append_instruction("movq".into(), "$1,(%rsp)".into());
@@ -1147,7 +1163,7 @@ impl AsmGenerator {
                 // if left_type != "bool" {
                 //     fail!("Cannot perform a logical or operation on `{left_type}`, mut be on type `bool`")
                 // }
-                let (register, suffix) = Self::gen_register(left_type);
+                let (register, suffix) = Self::gen_register_a(left_type);
                 left_exp.append_instruction(format!("cmp{suffix}"), format!("$0,%{register}"));
                 left_exp.append_instruction("jne".into(), second_condition);
                 left_exp.append_instruction("movq".into(), "$0,%rax".into());
@@ -1322,7 +1338,7 @@ impl AsmGenerator {
         parent_scope: u64,
         type_: &'static str,
     ) -> Asm {
-        let (register, suffix) = Self::gen_register(type_);
+        let (register, suffix) = Self::gen_register_a(type_);
         match operator {
             ast::UnaryOperator::Negation => {
                 Asm::instruction(format!("neg{suffix}"), format!("%{register}"))
@@ -1440,10 +1456,19 @@ impl AsmGenerator {
     }
 
     // returns the (register, suffix)
-    fn gen_register(type_: &'static str) -> (&str, char) {
+    fn gen_register_a(type_: &'static str) -> (&str, char) {
         match type_ {
             TYPE_LONG => ("rax", 'q'),
             TYPE_INT => ("eax", 'l'),
+            _ => todo!(),
+        }
+    }
+
+    // returns the (register, suffix)
+    fn gen_register_c(type_: &'static str) -> (&str, char) {
+        match type_ {
+            TYPE_LONG => ("rcx", 'q'),
+            TYPE_INT => ("ecx", 'l'),
             _ => todo!(),
         }
     }

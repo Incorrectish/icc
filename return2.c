@@ -1,8 +1,16 @@
 int main() {
-    int a = 1;
-    do {
-        a = a * 2;
-    } while(a < 11);
-
+    int a = 0;
+    if (a) {
+        int b = 2;
+        return b;
+    } else {
+        int c = 3;
+        if (a < c) {
+            return 4;
+        } else {
+            return 5;
+        }
+    }
     return a;
 }
+
